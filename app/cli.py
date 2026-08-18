@@ -32,16 +32,23 @@ from .sii.errors import SiiError
 from .web.formato import clp
 
 
-def _clave_para(rut_titular: str, pedir: bool) -> tuple[str, str]:
+def _clave_para(rut_titular: str, pedir: bool, rut_acceso: str | None = None) -> tuple[str, str]:
     """Devuelve ``(rut_login, clave)`` para el RUT titular indicado.
 
-    ``rut_login`` puede ser distinto del titular si la credencial guardada es
-    la de un representante legal (el SII siempre autentica a una persona
-    natural, que puede representar una o más empresas).
+    ``rut_login`` puede ser distinto del titular si quien firma es un
+    representante legal (el SII siempre autentica a una persona natural, que
+    puede representar una o más empresas). Si se pasa ``rut_acceso``
+    explícito (desde la línea de comandos), se usa directamente y se pide su
+    clave por teclado, sin buscar credenciales guardadas.
     """
     settings = get_settings()
     if settings.modo == "demo":
-        return rut_titular, ""
+        return rut_acceso or rut_titular, ""
+    if rut_acceso:
+        rut_acceso = str(parse_rut(rut_acceso))
+        if pedir and sys.stdin.isatty():
+            return rut_acceso, getpass(f"Clave tributaria de {rut_acceso}: ")
+        raise SystemExit(f"Falta la clave tributaria de {rut_acceso}.")
     with SessionLocal() as db:
         credencial = db.scalars(select(Credencial).where(Credencial.rut_titular == rut_titular)).first()
         if credencial:
@@ -59,7 +66,7 @@ def _cmd_sincronizar(args) -> int:
     rut = str(parse_rut(args.rut))
     periodos = rango_periodos(args.desde, args.hasta or args.desde)
     operaciones = tuple(o for o in (ep.COMPRA, ep.VENTA) if getattr(args, o.lower()))
-    rut_login, clave = _clave_para(rut, pedir=True)
+    rut_login, clave = _clave_para(rut, pedir=True, rut_acceso=args.rut_acceso)
     resultado = sincronizar(
         rut=rut,
         clave_tributaria=clave,
@@ -119,7 +126,7 @@ def _cmd_detalle_ventas(args) -> int:
     ultimo_dia = calendar.monthrange(int(periodo_hasta[:4]), int(periodo_hasta[4:]))[1]
     fecha_hasta = date(int(periodo_hasta[:4]), int(periodo_hasta[4:]), ultimo_dia)
 
-    rut_login, clave = _clave_para(rut, pedir=True)
+    rut_login, clave = _clave_para(rut, pedir=True, rut_acceso=args.rut_acceso)
     resultado = sincronizar_detalle_ventas(
         rut=rut,
         clave_tributaria=clave,
@@ -151,7 +158,12 @@ def construir_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="comando", required=True)
 
     sincro = sub.add_parser("sincronizar", help="Descarga periodos del SII")
-    sincro.add_argument("--rut", required=True)
+    sincro.add_argument("--rut", required=True, help="De quién son los documentos (el titular)")
+    sincro.add_argument(
+        "--rut-acceso",
+        default=None,
+        help="Con quién iniciar sesión, si es distinto del titular (representante legal)",
+    )
     sincro.add_argument("--desde", default=periodo_actual(), help="AAAAMM (por defecto, el periodo actual)")
     sincro.add_argument("--hasta", default=None, help="AAAAMM (por defecto, igual a --desde)")
     sincro.add_argument("--compra", action="store_true", help="Sólo compras")
@@ -174,7 +186,12 @@ def construir_parser() -> argparse.ArgumentParser:
         "detalle-ventas",
         help="Trae la glosa de ventas emitidas con el facturador gratuito del SII",
     )
-    detalle.add_argument("--rut", required=True)
+    detalle.add_argument("--rut", required=True, help="De quién son los documentos (el titular)")
+    detalle.add_argument(
+        "--rut-acceso",
+        default=None,
+        help="Con quién iniciar sesión, si es distinto del titular (representante legal)",
+    )
     detalle.add_argument("--desde", required=True, help="AAAAMM")
     detalle.add_argument("--hasta", default=None, help="AAAAMM (por defecto, igual a --desde)")
     detalle.set_defaults(func=_cmd_detalle_ventas)

@@ -134,6 +134,16 @@ MIPE_BASE = "https://www1.sii.cl"
 MIPE_ADMIN_DOCS = f"{MIPE_BASE}/cgi-bin/Portal001/mipeAdminDocsEmi.cgi"
 MIPE_DOWNLOAD = f"{MIPE_BASE}/cgi-bin/Portal001/mipeDownLoad.cgi"
 
+# Cuando el RUT autenticado representa a más de una empresa (el representante
+# legal de varias sociedades, por ejemplo), el SII exige elegir con cuál
+# operar antes de dejar entrar a cualquier página del MIPYME — si no, redirige
+# de vuelta a este menú general sin importar qué URL se haya pedido.
+MIPE_MENU = f"{MIPE_BASE}/factura_sii/factura_sii.htm"
+MIPE_SELECCIONAR_EMPRESA = f"{MIPE_BASE}/cgi-bin/Portal001/mipeSelEmpresa.cgi"
+# Campo oculto que trae el formulario real; sin él el SII también redirige al
+# menú aunque el RUT_EMP sea válido.
+MIPE_SELECCION_EMPRESA_ORIGEN = "OPCION=2&TIPO=4"
+
 # El botón "Archivo Respaldo" dispara un reCAPTCHA invisible antes de armar la
 # URL de descarga, así que hay que hacer clic de verdad en un navegador, igual
 # que en el login: no basta con pedir la URL directamente.

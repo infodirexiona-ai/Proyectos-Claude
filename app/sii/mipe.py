@@ -11,6 +11,12 @@ particularidades que obligan a manejarlas con un navegador real en vez de sólo
    ``MIPE_MAX_DOCUMENTOS_POR_DESCARGA`` documentos (lo avisa con un diálogo
    nativo del navegador, no con una respuesta HTTP de error), así que hay que
    partir el rango de fechas pedido en trozos más chicos y reintentar.
+3. Si el RUT autenticado representa a más de una empresa (el representante
+   legal de varias sociedades, por ejemplo), el SII exige elegir con cuál
+   operar antes de dejar ver cualquier documento — si no, cualquier URL del
+   MIPYME redirige de vuelta al menú general. Se resuelve mandando el mismo
+   ``POST`` que manda el formulario de selección, con el RUT de la empresa
+   como valor.
 
 Sólo sirve para documentos que el propio contribuyente emitió con el
 facturador gratuito del SII (VENTA). No aplica a documentos recibidos ni a
@@ -97,8 +103,29 @@ def _es_error_demasiados_documentos(mensaje: str) -> bool:
     return ep.MIPE_TEXTO_DEMASIADOS_DOCUMENTOS in mensaje.lower()
 
 
+def _seleccionar_empresa(contexto, rut_titular_obj, timeout_ms: int) -> None:
+    """Elige con qué empresa operar en el MIPYME.
+
+    Se hace siempre, no sólo cuando el RUT autenticado representa a más de
+    una empresa: seleccionar la única que tiene no rompe nada, y evita tener
+    que detectar si el SII mostró o no la pantalla de selección. Se manda por
+    ``contexto.request`` (comparte las cookies de la sesión) en vez de
+    navegar a la página del formulario y llenarlo, porque el ``POST`` es
+    exactamente lo que hace ese formulario y así nos ahorramos un viaje.
+    """
+    contexto.request.post(
+        ep.MIPE_SELECCIONAR_EMPRESA,
+        form={
+            "DESDE_DONDE_URL": ep.MIPE_SELECCION_EMPRESA_ORIGEN,
+            "RUT_EMP": str(rut_titular_obj),
+        },
+        timeout=timeout_ms,
+    )
+
+
 def descargar_detalle_ventas(
     rut: str,
+    rut_titular: str,
     clave_tributaria: str,
     fecha_desde: date,
     fecha_hasta: date,
@@ -111,6 +138,11 @@ def descargar_detalle_ventas(
 ) -> ResultadoDetalleVentas:
     """Descarga el detalle (glosa, cantidad, precio) de las ventas del rango.
 
+    ``rut`` es con quién se inicia sesión; ``rut_titular`` es la empresa cuyos
+    documentos se piden — el SII siempre autentica a una persona natural, que
+    puede representar una o más empresas, y exige elegir con cuál operar
+    antes de dejar ver cualquier documento.
+
     Parte el rango en tramos cada vez más angostos cada vez que el SII
     rechaza la descarga por traer demasiados documentos, hasta que cada tramo
     entra bajo el límite. Un tramo de un solo día que aun así se rechace queda
@@ -119,6 +151,7 @@ def descargar_detalle_ventas(
     PlaywrightError, _, sync_playwright = _importar_playwright()
 
     rut_obj = parse_rut(rut)
+    rut_titular_obj = parse_rut(rut_titular)
     resultado = ResultadoDetalleVentas()
     documentos_por_clave: dict[tuple[int, int], DocumentoEmitido] = {}
 
@@ -131,6 +164,7 @@ def descargar_detalle_ventas(
             contexto = navegador.new_context(user_agent=user_agent, accept_downloads=True)
             pagina = contexto.new_page()
             _login_en_pagina(pagina, rut_obj, clave_tributaria, entorno, timeout_ms)
+            _seleccionar_empresa(contexto, rut_titular_obj, timeout_ms)
 
             pendientes: list[tuple[date, date]] = [(fecha_desde, fecha_hasta)]
             intentos = 0

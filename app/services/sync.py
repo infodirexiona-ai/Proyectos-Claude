@@ -299,6 +299,7 @@ def sincronizar_detalle_ventas(
 
     detalle = descargar_detalle_ventas(
         rut_para_login,
+        rut_titular,
         clave_tributaria,
         fecha_desde,
         fecha_hasta,

@@ -83,6 +83,12 @@ OPERACIONES = (COMPRA, VENTA)
 # Texto que el portal devuelve cuando la sesión murió.
 SENTINELA_SESION_CAIDA = "NO ESTA AUTENTICADO"
 
+# Observado en producción (agosto 2026): getResumen devuelve codRespuesta=3, sin
+# mensaje, cuando el periodo no tiene documentos de ese tipo — en vez de una
+# lista vacía. No está documentado por el SII; si en el futuro se ve con otro
+# significado, hay que sacarlo de aquí.
+RESUMEN_CODIGO_SIN_DOCUMENTOS = 3
+
 # --- Tipos de documento tributario electrónico ------------------------------
 TIPOS_DTE = {
     30: "Factura",

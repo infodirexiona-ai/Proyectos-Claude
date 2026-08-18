@@ -28,6 +28,7 @@ from .services import export, reports
 from .services.periodos import normalizar_periodo, periodo_actual, rango_periodos
 from .services.sync import sincronizar, sincronizar_detalle_ventas
 from .sii import endpoints as ep
+from .sii.errors import SiiError
 from .web.formato import clp
 
 
@@ -195,7 +196,11 @@ def main(argv: list[str] | None = None) -> int:
         format="%(levelname)s %(name)s: %(message)s",
     )
     crear_esquema()
-    return args.func(args)
+    try:
+        return args.func(args)
+    except SiiError as exc:
+        print(f"Error del SII: {exc}")
+        return 1
 
 
 if __name__ == "__main__":

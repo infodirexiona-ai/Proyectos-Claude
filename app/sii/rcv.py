@@ -131,7 +131,9 @@ class ClienteRCV:
             data["accionRecaptcha"] = "RCV_DETC" if operacion == ep.COMPRA else "RCV_DETV"
         return data
 
-    def _post_json(self, ruta: str, metodo: str, data: dict) -> dict:
+    def _post_json(
+        self, ruta: str, metodo: str, data: dict, *, codigos_vacios: frozenset = frozenset()
+    ) -> dict:
         self.inicializar()
         self._esperar()
         respuesta = self.sesion.cliente.post(
@@ -147,6 +149,10 @@ class ClienteRCV:
             ) from exc
         estado = payload.get("respEstado") or {}
         codigo = estado.get("codRespuesta")
+        if codigo in codigos_vacios:
+            # Observado en producción: el SII usa este código para decir "no hay
+            # documentos de este tipo en el periodo", en vez de una lista vacía.
+            return payload
         if codigo not in (None, 0, "0"):
             raise RespuestaInesperada(
                 f"El SII rechazó {metodo}: [{codigo}] {estado.get('msgeRespuesta', 'sin detalle')}"
@@ -166,6 +172,7 @@ class ClienteRCV:
             ep.ENDPOINTS["resumen"],
             "getResumen",
             self._data(periodo, operacion, estado_contab, busqueda_inicial=True),
+            codigos_vacios=frozenset({ep.RESUMEN_CODIGO_SIN_DOCUMENTOS}),
         )
         return parsear_resumen(payload)
 

@@ -70,7 +70,8 @@ make demo    # http://localhost:8000
 ## Uso real
 
 1. Pon `SII_MODO=real` en el `.env`.
-2. Levanta la app: `make servir`.
+2. Levanta la app: `make servir` (Linux/Mac) o, en Windows, doble clic en `iniciar.bat`
+   (abre el servidor en su propia ventana y el navegador solo).
 3. Abre **Diagnóstico** y confirma que todo esté en verde (clave de cifrado, navegador,
    conexión al SII). Si algo falla, ahí mismo dice cómo resolverlo.
 4. En **Credenciales**, guarda tu RUT y clave tributaria (queda cifrada con Fernet).

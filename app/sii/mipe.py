@@ -103,24 +103,43 @@ def _es_error_demasiados_documentos(mensaje: str) -> bool:
     return ep.MIPE_TEXTO_DEMASIADOS_DOCUMENTOS in mensaje.lower()
 
 
-def _seleccionar_empresa(contexto, rut_titular_obj, timeout_ms: int) -> None:
+def _seleccionar_empresa(pagina, rut_titular_obj, timeout_ms: int) -> None:
     """Elige con qué empresa operar en el MIPYME.
 
     Se hace siempre, no sólo cuando el RUT autenticado representa a más de
     una empresa: seleccionar la única que tiene no rompe nada, y evita tener
-    que detectar si el SII mostró o no la pantalla de selección. Se manda por
-    ``contexto.request`` (comparte las cookies de la sesión) en vez de
-    navegar a la página del formulario y llenarlo, porque el ``POST`` es
-    exactamente lo que hace ese formulario y así nos ahorramos un viaje.
+    que detectar si el SII mostró o no la pantalla de selección.
+
+    Arma el mismo formulario que "SELECCIÓN DE EMPRESA" y lo envía dentro de
+    la propia página (no por un canal de API aparte): un ``POST`` mandado por
+    fuera de la página no dejaba la sesión bien sincronizada con las
+    navegaciones siguientes en el navegador — se comprobó en vivo que fallaba
+    justo después.
     """
-    contexto.request.post(
-        ep.MIPE_SELECCIONAR_EMPRESA,
-        form={
-            "DESDE_DONDE_URL": ep.MIPE_SELECCION_EMPRESA_ORIGEN,
-            "RUT_EMP": str(rut_titular_obj),
-        },
-        timeout=timeout_ms,
-    )
+    with pagina.expect_navigation(wait_until="networkidle", timeout=timeout_ms):
+        pagina.evaluate(
+            """([url, campoOrigen, origen, campoRut, rut]) => {
+                const forma = document.createElement("form");
+                forma.method = "POST";
+                forma.action = url;
+                for (const [nombre, valor] of [[campoOrigen, origen], [campoRut, rut]]) {
+                    const campo = document.createElement("input");
+                    campo.type = "hidden";
+                    campo.name = nombre;
+                    campo.value = valor;
+                    forma.appendChild(campo);
+                }
+                document.body.appendChild(forma);
+                forma.submit();
+            }""",
+            [
+                ep.MIPE_SELECCIONAR_EMPRESA,
+                "DESDE_DONDE_URL",
+                ep.MIPE_SELECCION_EMPRESA_ORIGEN,
+                "RUT_EMP",
+                str(rut_titular_obj),
+            ],
+        )
 
 
 def descargar_detalle_ventas(
@@ -164,7 +183,7 @@ def descargar_detalle_ventas(
             contexto = navegador.new_context(user_agent=user_agent, accept_downloads=True)
             pagina = contexto.new_page()
             _login_en_pagina(pagina, rut_obj, clave_tributaria, entorno, timeout_ms)
-            _seleccionar_empresa(contexto, rut_titular_obj, timeout_ms)
+            _seleccionar_empresa(pagina, rut_titular_obj, timeout_ms)
 
             pendientes: list[tuple[date, date]] = [(fecha_desde, fecha_hasta)]
             intentos = 0

@@ -13,6 +13,8 @@ Autenticación con **RUT + clave tributaria**. Backend en FastAPI, almacenamient
 - **Guarda** cada documento normalizado (tipo, folio, contraparte, fechas, montos, IVA y sus
   desgloses) y conserva el CSV original que entrega el SII.
 - **Consulta** con filtros por periodo, operación, tipo de documento, contraparte o texto libre.
+- **Trae la glosa** (detalle línea por línea: descripción, cantidad, precio) de las ventas que
+  emitiste con el facturador gratuito del SII — el RCV solo trae montos, no el detalle.
 - **Reporta**: totales por periodo, por tipo de documento, por contraparte, y un resumen de IVA
   débito/crédito por periodo.
 - **Exporta** a Excel (un libro con cinco hojas) o CSV.
@@ -28,11 +30,12 @@ Consecuencias prácticas:
 
 - **Puede romperse cuando el SII cambie su portal.** Todo lo específico del SII está aislado en
   `app/sii/endpoints.py` y `app/sii/rcv.py`, para que la reparación sea acotada.
-- **El flujo real no está verificado contra el SII.** Se desarrolló en un entorno sin salida a
+- **El flujo del RCV no está verificado contra el SII.** Se desarrolló en un entorno sin salida a
   `*.sii.cl` (política de red del sandbox), así que el login y las llamadas al RCV están cubiertos
   por tests con respuestas de ejemplo (JSON y CSV), pero nunca se ejecutaron contra el portal de
   verdad. Antes de confiar en ella, corre `python -m app.cli doctor` (o la pestaña
-  **Diagnóstico**) y descarga primero un solo periodo.
+  **Diagnóstico**) y descarga primero un solo periodo. El flujo de glosa de ventas (MIPYME) es la
+  excepción: sí se probó a mano contra el portal real.
 - **El SII limita las sesiones concurrentes por RUT.** La app cierra la sesión al terminar cada
   descarga; evita lanzar varias en paralelo para el mismo RUT.
 - **Sé prudente con la frecuencia.** Hay una pausa configurable entre llamadas
@@ -73,6 +76,9 @@ make demo    # http://localhost:8000
 4. En **Credenciales**, guarda tu RUT y clave tributaria (queda cifrada con Fernet).
 5. En el **Panel**, elige el rango de periodos y pulsa *Descargar* — empieza con uno solo.
 6. Sigue el avance en **Descargas**; al terminar, revisa **Documentos** y **Reportes**.
+7. Si necesitas la glosa de tus ventas (y las emitiste con el facturador gratuito del SII), abre
+   **Documentos**, filtra por Ventas, despliega "Traer glosa de las ventas" y pide el mismo rango
+   de periodos. Actualiza los documentos que ya bajaste; no crea nuevos.
 
 Lo mismo por línea de comandos, antes de automatizar nada:
 
@@ -96,6 +102,9 @@ python -m app.cli resumen --rut 76.192.083-9
 
 # Exportar lo ya descargado
 python -m app.cli exportar --rut 76.192.083-9 --desde 202401 --salida rcv-2024.xlsx
+
+# Traer la glosa de ventas emitidas con el facturador gratuito del SII
+python -m app.cli detalle-ventas --rut 76.192.083-9 --desde 202401 --hasta 202403
 ```
 
 Para un cron diario, guarda la credencial desde la web (o define `SII_RUT` y
@@ -139,11 +148,34 @@ los totales del periodo. Los reportes hacen lo mismo (`TIPOS_NOTA_CREDITO` en
 contraparte) — sin el periodo, porque el SII puede registrar en otro mes una factura recibida con
 retraso, y sigue siendo el mismo documento.
 
+**Glosa de ventas** (`app/sii/mipe.py`): el RCV no trae el detalle línea por línea, sólo montos. Para
+eso existe un portal aparte y más simple — el "Sistema de Facturación Gratuita del SII" (páginas CGI
+clásicas en `www1.sii.cl`, no una SPA), donde puedes volver a ver los documentos que emitiste con esa
+herramienta. Dos particularidades:
+
+- El botón de descarga ("Archivo Respaldo") dispara un reCAPTCHA invisible antes de armar la URL, así
+  que hace falta un navegador real haciendo clic, no un `GET` directo.
+- El servidor rechaza cualquier búsqueda que junte más de 20 documentos con un diálogo nativo
+  ("...retornan demasiados Documentos electrónicos"), en vez de truncar el resultado. La app parte el
+  rango de fechas pedido a la mitad cada vez que choca con ese límite, y reintenta, hasta que cada
+  tramo entra bajo el tope.
+
+El XML de respaldo trae el nombre corto del ítem (`NmbItem`) y, si el emisor usó el cuadro de texto
+largo del facturador, una descripción aparte (`DscItem`) que el Excel del mismo sistema descarta al
+exportar — la app junta ambos para reconstruir la glosa completa.
+
+Sólo sirve para **ventas** emitidas con el facturador gratuito del SII: no aplica a documentos
+recibidos (el emisor te los manda directo a ti, el SII no guarda una copia consultable) ni a
+documentos emitidos con un facturador privado (Nubox, Bsale, etc.), cuyo detalle vive en esa
+plataforma. A diferencia del resto de `app/sii`, este flujo sí se verificó a mano contra el portal
+real.
+
 ## Lo que esta versión no hace
 
-- **No descarga el XML de cada DTE.** Descarga el detalle completo del RCV (datos + CSV oficial).
-  Bajar el XML firmado documento por documento va por otro módulo del SII y, en general, requiere
-  autenticación con certificado digital.
+- **No trae la glosa de documentos recibidos ni de ventas emitidas con un facturador privado.** El
+  SII no ofrece ningún canal (con clave tributaria ni con certificado) para recuperar el detalle de
+  una factura recibida si no la guardaste tú mismo; y el detalle de ventas emitidas con Nubox, Bsale
+  u otro proveedor vive en esa plataforma, no en el SII.
 - **No incluye boletas de honorarios**: viven en otro portal y tienen otro modelo de datos
   (retención en vez de IVA).
 - **No emite documentos.** Es sólo de lectura.

@@ -153,3 +153,26 @@ def test_diagnostico_api(cliente):
     nombres = {c["nombre"] for c in datos["chequeos"]}
     assert "Modo de operación" in nombres
     assert "Base de datos" in nombres
+
+
+def test_detalle_ventas_demo_completa_la_glosa(cliente_con_datos):
+    respuesta = cliente_con_datos.post(
+        "/sincronizar-detalle-ventas",
+        data={"rut": RUT, "desde": "202403", "hasta": "202404"},
+        follow_redirects=False,
+    )
+    assert respuesta.status_code == 303
+
+    trabajo = cliente_con_datos.get("/api/sincronizaciones/2").json()
+    assert trabajo["estado"] == "ok"
+    assert trabajo["actualizados"] > 0
+
+    pagina = cliente_con_datos.get("/documentos", params={"titular": RUT, "operacion": "VENTA"})
+    assert "Ver (" in pagina.text
+
+
+def test_detalle_ventas_rut_invalido(cliente):
+    respuesta = cliente.post(
+        "/sincronizar-detalle-ventas", data={"rut": "12345678-9", "desde": "202403", "hasta": "202403"}
+    )
+    assert respuesta.status_code == 400

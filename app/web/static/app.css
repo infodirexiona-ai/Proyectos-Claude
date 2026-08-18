@@ -136,6 +136,15 @@ button, .boton-secundario {
 .tabla-densa td, .tabla-densa th { padding: 0.35rem 0.5rem; }
 .tabla .ancho { width: 130px; }
 .tabla .mensaje { max-width: 320px; color: var(--suave); font-size: 0.8rem; white-space: pre-line; }
+.tabla .glosa { max-width: 260px; }
+.tabla .glosa details summary { cursor: pointer; color: var(--acento); font-size: 0.82rem; }
+.tabla .glosa ul { margin: 0.4rem 0 0; padding-left: 1.1rem; font-size: 0.82rem; color: var(--texto); white-space: normal; }
+.tabla .glosa ul li + li { margin-top: 0.3rem; }
+.nota-glosa { color: var(--suave); }
+
+.tarjeta-detalle-ventas { margin: 1rem 0; padding: 0.75rem 1rem; border: 1px dashed var(--borde); border-radius: 8px; }
+.tarjeta-detalle-ventas summary { cursor: pointer; font-weight: 600; color: var(--acento); }
+.tarjeta-detalle-ventas .formulario-linea { margin-top: 0.75rem; }
 
 .barra-dato { display: block; height: 8px; border-radius: 999px; background: var(--acento); min-width: 2px; }
 .barra-compra { background: var(--compra); }

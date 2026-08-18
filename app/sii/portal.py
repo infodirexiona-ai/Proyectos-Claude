@@ -69,6 +69,52 @@ def _cliente_httpx(cookies: list[dict], user_agent: str, timeout_ms: int) -> htt
     )
 
 
+def _importar_playwright():
+    try:
+        from playwright.sync_api import Error as PlaywrightError
+        from playwright.sync_api import TimeoutError as PlaywrightTimeout
+        from playwright.sync_api import sync_playwright
+    except ImportError as exc:  # pragma: no cover - depende de la instalación
+        raise SiiError(
+            "Falta Playwright. Instálalo con: pip install playwright && playwright install chromium"
+        ) from exc
+    return PlaywrightError, PlaywrightTimeout, sync_playwright
+
+
+def _login_en_pagina(pagina, rut_obj: Rut, clave_tributaria: str, entorno: str, timeout_ms: int):
+    """Completa el formulario de RUT + clave en una página ya abierta.
+
+    Lanza si el SII rechaza las credenciales; no cierra nada por su cuenta,
+    para que quien llama decida si sigue usando la página (MIPYME) o solo
+    necesita las cookies (RCV).
+    """
+    _, PlaywrightTimeout, _ = _importar_playwright()
+
+    pagina.goto(ep.url_login(entorno), timeout=timeout_ms)
+    try:
+        pagina.wait_for_selector(ep.SEL_RUT, timeout=timeout_ms)
+    except PlaywrightTimeout as exc:
+        raise SiiError(
+            "No apareció el formulario de login del SII. El portal puede estar "
+            "en mantención o mostrando una sala de espera."
+        ) from exc
+
+    pagina.fill(ep.SEL_RUT, str(rut_obj))
+    pagina.fill(ep.SEL_CLAVE, clave_tributaria)
+    try:
+        with pagina.expect_navigation(wait_until="networkidle", timeout=timeout_ms):
+            pagina.click(ep.SEL_BOTON)
+    except PlaywrightTimeout:
+        # Algunas versiones del portal navegan por JS sin disparar el evento.
+        pagina.wait_for_load_state("networkidle", timeout=timeout_ms)
+
+    url_final = pagina.url
+    if "IngresoRutClave" in url_final or "CAutInicio" in url_final:
+        raise CredencialesInvalidas(
+            "El SII rechazó el acceso: revisa el RUT y la clave tributaria (o el portal pidió un captcha)."
+        )
+
+
 def iniciar_sesion(
     rut: str,
     clave_tributaria: str,
@@ -81,17 +127,16 @@ def iniciar_sesion(
 ) -> SesionPortal:
     """Autentica en el portal y devuelve una sesión lista para consultar el RCV.
 
+    Cierra el navegador apenas obtiene las cookies: el RCV se consulta después
+    con ``httpx``, mucho más rápido para las decenas de llamadas que hacen
+    falta. Para flujos que necesitan seguir interactuando con la página
+    después de autenticar (como MIPYME, por el reCAPTCHA en la descarga), usa
+    ``app.sii.mipe`` en su lugar.
+
     La clave tributaria sólo viaja al formulario del SII; nunca se registra en
     los logs ni se guarda en disco desde aquí.
     """
-    try:
-        from playwright.sync_api import Error as PlaywrightError
-        from playwright.sync_api import TimeoutError as PlaywrightTimeout
-        from playwright.sync_api import sync_playwright
-    except ImportError as exc:  # pragma: no cover - depende de la instalación
-        raise SiiError(
-            "Falta Playwright. Instálalo con: pip install playwright && playwright install chromium"
-        ) from exc
+    PlaywrightError, _, sync_playwright = _importar_playwright()
 
     rut_obj = parse_rut(rut)
     log.info("Iniciando sesión en el SII para %s", rut_obj.formateado)
@@ -104,32 +149,9 @@ def iniciar_sesion(
         try:
             contexto = navegador.new_context(user_agent=user_agent)
             pagina = contexto.new_page()
-            pagina.goto(ep.url_login(entorno), timeout=timeout_ms)
-            try:
-                pagina.wait_for_selector(ep.SEL_RUT, timeout=timeout_ms)
-            except PlaywrightTimeout as exc:
-                raise SiiError(
-                    "No apareció el formulario de login del SII. El portal puede estar "
-                    "en mantención o mostrando una sala de espera."
-                ) from exc
+            _login_en_pagina(pagina, rut_obj, clave_tributaria, entorno, timeout_ms)
 
-            pagina.fill(ep.SEL_RUT, str(rut_obj))
-            pagina.fill(ep.SEL_CLAVE, clave_tributaria)
-            try:
-                with pagina.expect_navigation(wait_until="networkidle", timeout=timeout_ms):
-                    pagina.click(ep.SEL_BOTON)
-            except PlaywrightTimeout:
-                # Algunas versiones del portal navegan por JS sin disparar el evento.
-                pagina.wait_for_load_state("networkidle", timeout=timeout_ms)
-
-            url_final = pagina.url
             cookies = contexto.cookies()
-
-            if "IngresoRutClave" in url_final or "CAutInicio" in url_final:
-                raise CredencialesInvalidas(
-                    "El SII rechazó el acceso: revisa el RUT y la clave tributaria "
-                    "(o el portal pidió un captcha)."
-                )
             if not cookies:
                 raise SiiError("El login no dejó cookies: no se pudo abrir la sesión.")
 

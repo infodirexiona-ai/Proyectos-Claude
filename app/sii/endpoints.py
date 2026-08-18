@@ -111,3 +111,36 @@ def nombre_tipo_dte(codigo: int | str | None) -> str:
         return TIPOS_DTE.get(int(codigo), f"Tipo {codigo}")  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return "Desconocido"
+
+
+# --- Sistema de Facturación Gratuita del SII (MIPYME) -----------------------
+#
+# Portal distinto al RCV: no es una SPA Angular sino páginas CGI clásicas
+# (``www1.sii.cl/cgi-bin/Portal001``). Sirve para volver a ver, con el detalle
+# línea por línea (glosa incluida), los documentos que el propio contribuyente
+# emitió con el facturador gratuito del SII. No aplica a documentos recibidos
+# ni a documentos emitidos con un facturador privado (Nubox, Bsale, etc.).
+#
+# Flujo verificado a mano contra el portal real en agosto de 2026 (a diferencia
+# del resto de ``app/sii``, que se portó de investigación de terceros sin poder
+# probarlo en vivo).
+MIPE_BASE = "https://www1.sii.cl"
+MIPE_ADMIN_DOCS = f"{MIPE_BASE}/cgi-bin/Portal001/mipeAdminDocsEmi.cgi"
+MIPE_DOWNLOAD = f"{MIPE_BASE}/cgi-bin/Portal001/mipeDownLoad.cgi"
+
+# El botón "Archivo Respaldo" dispara un reCAPTCHA invisible antes de armar la
+# URL de descarga, así que hay que hacer clic de verdad en un navegador, igual
+# que en el login: no basta con pedir la URL directamente.
+MIPE_BOTON_RESPALDO = "input[name='Button_xml']"
+MIPE_CAMPO_RUT_RECEPTOR = "input[name='RUT_RECP']"
+MIPE_CAMPO_FOLIO = "input[name='FOLIO']"
+MIPE_CAMPO_FECHA_DESDE = "input[name='FEC_DESDE']"
+MIPE_CAMPO_FECHA_HASTA = "input[name='FEC_HASTA']"
+MIPE_CAMPO_TIPO_DOC = "select[name='TPO_DOC']"
+MIPE_BOTON_BUSCAR = "input[name='BTN_SUBMIT']"
+
+# El servidor rechaza una descarga que reúna más de este número de documentos:
+# muestra un diálogo nativo ("<host> dice") pidiendo acotar la búsqueda, en vez
+# de truncar el resultado. Hay que partir el rango de fechas y reintentar.
+MIPE_MAX_DOCUMENTOS_POR_DESCARGA = 20
+MIPE_TEXTO_DEMASIADOS_DOCUMENTOS = "demasiados documentos"

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from .config import get_settings
@@ -36,6 +36,23 @@ def crear_esquema() -> None:
     from .models import Base
 
     Base.metadata.create_all(engine)
+    _migrar_columnas_nuevas()
+
+
+def _migrar_columnas_nuevas() -> None:
+    """Agrega columnas nuevas a tablas que ya existían de una versión anterior.
+
+    ``create_all`` sólo crea tablas que faltan; no altera las que ya están.
+    Como esta app no trae un sistema de migraciones aparte, las columnas que se
+    van sumando entre versiones se agregan aquí a mano, sin tocar los datos.
+    """
+    inspector = inspect(engine)
+    if "documentos" not in inspector.get_table_names():
+        return
+    columnas = {c["name"] for c in inspector.get_columns("documentos")}
+    if "detalle" not in columnas:
+        with engine.begin() as conexion:
+            conexion.execute(text("ALTER TABLE documentos ADD COLUMN detalle JSON"))
 
 
 @contextmanager

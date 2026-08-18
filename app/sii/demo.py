@@ -72,6 +72,31 @@ def documentos_demo(periodo: str, operacion: str, estado_contab: str = ep.REGIST
     return documentos
 
 
+_GLOSAS = [
+    "Servicios de consultoría en gestión, según lo acordado con el cliente.",
+    "Desarrollo de plan de difusión en medios y gestión de redes sociales.",
+    "Formación y capacitación de personal según especificaciones técnicas adjuntas.",
+    "Arriendo mensual de oficina, incluye gastos comunes.",
+    "Venta de mercadería según guía de despacho adjunta.",
+    "Servicios profesionales de marketing digital, mes en curso.",
+]
+
+
+def detalle_demo(documento: DocumentoSII) -> list[dict]:
+    """Una línea de detalle de ejemplo, coherente con el monto del documento."""
+    rnd = random.Random(f"{documento.periodo}:{documento.operacion}:{documento.folio}")
+    return [
+        {
+            "numero": 1,
+            "codigo": "",
+            "descripcion": rnd.choice(_GLOSAS),
+            "cantidad": "1.00",
+            "precio": str(documento.monto_neto or documento.monto_exento),
+            "monto": str(documento.monto_neto or documento.monto_exento),
+        }
+    ]
+
+
 def resumen_demo(periodo: str, operacion: str, estado_contab: str = ep.REGISTRO) -> list[ResumenTipoDoc]:
     por_tipo: dict[int, ResumenTipoDoc] = {}
     for doc in documentos_demo(periodo, operacion, estado_contab):

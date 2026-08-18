@@ -9,8 +9,10 @@ Ejemplos:
 from __future__ import annotations
 
 import argparse
+import calendar
 import logging
 import sys
+from datetime import date
 from getpass import getpass
 from pathlib import Path
 
@@ -23,8 +25,8 @@ from .diagnostico import ejecutar_diagnostico
 from .models import Credencial
 from .rut import parse_rut
 from .services import export, reports
-from .services.periodos import periodo_actual, rango_periodos
-from .services.sync import sincronizar
+from .services.periodos import normalizar_periodo, periodo_actual, rango_periodos
+from .services.sync import sincronizar, sincronizar_detalle_ventas
 from .sii import endpoints as ep
 from .web.formato import clp
 
@@ -98,6 +100,27 @@ def _cmd_resumen(args) -> int:
     return 0
 
 
+def _cmd_detalle_ventas(args) -> int:
+    rut = str(parse_rut(args.rut))
+    periodo_desde = normalizar_periodo(args.desde)
+    periodo_hasta = normalizar_periodo(args.hasta or args.desde)
+    fecha_desde = date(int(periodo_desde[:4]), int(periodo_desde[4:]), 1)
+    ultimo_dia = calendar.monthrange(int(periodo_hasta[:4]), int(periodo_hasta[4:]))[1]
+    fecha_hasta = date(int(periodo_hasta[:4]), int(periodo_hasta[4:]), ultimo_dia)
+
+    resultado = sincronizar_detalle_ventas(
+        rut=rut,
+        clave_tributaria=_clave_para(rut, pedir=True),
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+    )
+    print(f"Periodos: {periodo_desde} → {periodo_hasta}")
+    print(f"Documentos con glosa actualizada: {resultado.actualizados}")
+    for aviso in resultado.avisos:
+        print(f"  ! {aviso}")
+    return 0
+
+
 def _cmd_doctor(args) -> int:
     chequeos = ejecutar_diagnostico(revisar_red=not args.sin_red)
     for chequeo in chequeos:
@@ -133,6 +156,15 @@ def construir_parser() -> argparse.ArgumentParser:
     resumen = sub.add_parser("resumen", help="Muestra el IVA por periodo en la terminal")
     resumen.add_argument("--rut", required=True)
     resumen.set_defaults(func=_cmd_resumen)
+
+    detalle = sub.add_parser(
+        "detalle-ventas",
+        help="Trae la glosa de ventas emitidas con el facturador gratuito del SII",
+    )
+    detalle.add_argument("--rut", required=True)
+    detalle.add_argument("--desde", required=True, help="AAAAMM")
+    detalle.add_argument("--hasta", default=None, help="AAAAMM (por defecto, igual a --desde)")
+    detalle.set_defaults(func=_cmd_detalle_ventas)
 
     clave = sub.add_parser("generar-clave", help="Genera una SII_CLAVE_CIFRADO")
     clave.set_defaults(func=lambda _args: (print(generar_clave()), 0)[1])

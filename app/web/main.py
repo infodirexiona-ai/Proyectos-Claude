@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import calendar
 import logging
 from contextlib import asynccontextmanager
+from datetime import date
 from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Form, HTTPException, Query, Request
@@ -21,8 +23,12 @@ from ..diagnostico import ejecutar_diagnostico
 from ..models import Credencial, Sincronizacion
 from ..rut import RutInvalido, parse_rut
 from ..services import export, reports
-from ..services.periodos import PeriodoInvalido, periodo_actual, rango_periodos
-from ..services.sync import ruta_descarga, sincronizar_en_segundo_plano
+from ..services.periodos import PeriodoInvalido, normalizar_periodo, periodo_actual, rango_periodos
+from ..services.sync import (
+    ruta_descarga,
+    sincronizar_detalle_ventas_en_segundo_plano,
+    sincronizar_en_segundo_plano,
+)
 from ..sii import endpoints as ep
 from .formato import FILTROS
 
@@ -335,6 +341,58 @@ def lanzar_sincronizacion(
         clave_tributaria=clave_final,
         periodos=periodos,
         operaciones=operaciones,
+        sync_id=trabajo.id,
+    )
+    return RedirectResponse(url="/sincronizaciones", status_code=303)
+
+
+@app.post("/sincronizar-detalle-ventas")
+def lanzar_sincronizacion_detalle_ventas(
+    tareas: BackgroundTasks,
+    db: Session = Depends(get_db),
+    rut: str = Form(...),
+    desde: str = Form(...),
+    hasta: str = Form(...),
+    clave: str | None = Form(None),
+):
+    """Trae la glosa de ventas ya descargadas por el RCV, vía el MIPYME.
+
+    Sólo sirve para documentos que el propio contribuyente emitió con el
+    facturador gratuito del SII, y sólo actualiza documentos que ya existan
+    (hay que haber corrido una descarga normal para ese rango antes).
+    """
+    settings = get_settings()
+    try:
+        rut_titular = str(parse_rut(rut))
+        periodo_desde = normalizar_periodo(desde)
+        periodo_hasta = normalizar_periodo(hasta)
+    except (RutInvalido, PeriodoInvalido) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    fecha_desde = date(int(periodo_desde[:4]), int(periodo_desde[4:]), 1)
+    ultimo_dia = calendar.monthrange(int(periodo_hasta[:4]), int(periodo_hasta[4:]))[1]
+    fecha_hasta = date(int(periodo_hasta[:4]), int(periodo_hasta[4:]), ultimo_dia)
+
+    clave_final = (clave or "").strip()
+    if not clave_final and settings.modo != "demo":
+        clave_final = _clave_guardada(db, rut_titular, settings)
+
+    trabajo = Sincronizacion(
+        rut_titular=rut_titular,
+        periodo_desde=periodo_desde,
+        periodo_hasta=periodo_hasta,
+        operaciones="VENTA_DETALLE",
+    )
+    db.add(trabajo)
+    db.commit()
+    db.refresh(trabajo)
+
+    tareas.add_task(
+        sincronizar_detalle_ventas_en_segundo_plano,
+        rut=rut_titular,
+        clave_tributaria=clave_final,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
         sync_id=trabajo.id,
     )
     return RedirectResponse(url="/sincronizaciones", status_code=303)

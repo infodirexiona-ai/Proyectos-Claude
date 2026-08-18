@@ -36,12 +36,32 @@
     </span>
   </div>
 
+  <details class="tarjeta-detalle-ventas">
+    <summary>Traer glosa de las ventas (opcional)</summary>
+    <p class="nota">
+      Sólo funciona para facturas de <strong>venta</strong> que emitiste con el
+      <strong>facturador gratuito del SII</strong> (no aplica a las que recibiste, ni a las
+      emitidas con un facturador privado como Nubox o Bsale). Necesita que ya hayas descargado
+      el periodo con el RCV — esto sólo completa la glosa encima.
+    </p>
+    <form method="post" action="/sincronizar-detalle-ventas" class="formulario-linea">
+      <input type="hidden" name="rut" value="{{ titular }}">
+      <label>Desde <input type="text" name="desde" required placeholder="AAAAMM" value="{{ filtros.desde }}"></label>
+      <label>Hasta <input type="text" name="hasta" required placeholder="AAAAMM" value="{{ filtros.hasta }}"></label>
+      {% if modo != 'demo' %}
+      <label>Clave tributaria <input type="password" name="clave" placeholder="(usa la guardada)"></label>
+      {% endif %}
+      <button type="submit">Traer glosa</button>
+    </form>
+  </details>
+
   <table class="tabla tabla-densa">
     <thead>
       <tr>
         <th>Periodo</th><th>Op.</th><th>Tipo</th><th class="num">Folio</th>
         <th>Contraparte</th><th>Emisión</th>
         <th class="num">Exento</th><th class="num">Neto</th><th class="num">IVA</th><th class="num">Total</th>
+        <th>Glosa</th>
       </tr>
     </thead>
     <tbody>
@@ -60,9 +80,27 @@
         <td class="num">{{ d.monto_neto | clp }}</td>
         <td class="num">{{ d.monto_iva | clp }}</td>
         <td class="num fuerte">{{ d.monto_total | clp }}</td>
+        <td class="glosa">
+          {% if d.tiene_detalle %}
+          <details>
+            <summary>Ver ({{ d.detalle | length }})</summary>
+            <ul>
+              {% for linea in d.detalle %}
+              <li>{{ linea.descripcion }}
+                {%- if linea.cantidad and linea.cantidad != '1.00' %} — {{ linea.cantidad }} x {{ linea.precio | clp }}{% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+          </details>
+          {% elif d.operacion == 'VENTA' %}
+          <span class="nota-glosa" title="Sólo para documentos emitidos con el facturador gratuito del SII">—</span>
+          {% else %}
+          —
+          {% endif %}
+        </td>
       </tr>
       {% else %}
-      <tr><td colspan="10" class="vacio">Sin resultados para este filtro.</td></tr>
+      <tr><td colspan="11" class="vacio">Sin resultados para este filtro.</td></tr>
       {% endfor %}
     </tbody>
   </table>

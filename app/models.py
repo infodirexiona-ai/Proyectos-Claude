@@ -86,6 +86,13 @@ class Documento(Base):
     tipo_transaccion: Mapped[str] = mapped_column(String(60), default="")
     origen: Mapped[str] = mapped_column(String(10), default="csv")  # csv | json | demo
     raw: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    # Detalle línea por línea (glosa, cantidad, precio) de documentos que el
+    # propio contribuyente emitió con el facturador gratuito del SII. El RCV no
+    # lo trae; se completa aparte, vía app.sii.mipe, sólo para VENTA. Lista de
+    # {codigo, descripcion, cantidad, precio, monto}.
+    detalle: Mapped[list] = mapped_column(JSON, default=list)
+
     creado: Mapped[datetime] = mapped_column(DateTime, default=_ahora)
     actualizado: Mapped[datetime] = mapped_column(DateTime, default=_ahora, onupdate=_ahora)
 
@@ -96,6 +103,10 @@ class Documento(Base):
     @property
     def periodo_legible(self) -> str:
         return f"{self.periodo[4:6]}/{self.periodo[0:4]}" if len(self.periodo) == 6 else self.periodo
+
+    @property
+    def tiene_detalle(self) -> bool:
+        return bool(self.detalle)
 
 
 class Sincronizacion(Base):

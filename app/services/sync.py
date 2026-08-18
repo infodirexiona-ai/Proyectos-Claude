@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from sqlalchemy import select
@@ -15,8 +15,9 @@ from ..db import sesion_db
 from ..models import Documento, Sincronizacion
 from ..rut import parse_rut
 from ..sii import endpoints as ep
-from ..sii.demo import documentos_demo
+from ..sii.demo import detalle_demo, documentos_demo
 from ..sii.errors import SiiError
+from ..sii.mipe import descargar_detalle_ventas
 from ..sii.modelos import DocumentoSII
 from ..sii.portal import iniciar_sesion
 from ..sii.rcv import ClienteRCV
@@ -195,6 +196,120 @@ def sincronizar(
 
     _marcar(sync_id, estado="ok", resultado=resultado)
     return resultado
+
+
+def guardar_detalle_ventas(db: Session, rut_titular: str, documentos) -> int:
+    """Guarda el detalle (glosa, cantidad, precio) sobre documentos de venta ya existentes.
+
+    Sólo actualiza filas que el RCV ya trajo — no crea documentos nuevos, porque
+    el detalle por sí solo no trae todos los campos que el RCV sí tiene (estado,
+    fecha de recepción, etc.). Si no hay coincidencia por (tipo, folio), el
+    documento se ignora y queda contado en ``sin_coincidencia``.
+    """
+    if not documentos:
+        return 0
+
+    tipos = {d.tipo_doc for d in documentos}
+    folios = sorted({d.folio for d in documentos})
+    existentes: dict[tuple[int, int], Documento] = {}
+    for inicio in range(0, len(folios), 400):
+        lote = folios[inicio : inicio + 400]
+        for fila in db.scalars(
+            select(Documento).where(
+                Documento.rut_titular == rut_titular,
+                Documento.operacion == ep.VENTA,
+                Documento.tipo_doc.in_(tipos),
+                Documento.folio.in_(lote),
+            )
+        ):
+            existentes[(fila.tipo_doc, fila.folio)] = fila
+
+    actualizados = 0
+    for doc in documentos:
+        fila = existentes.get(doc.clave)
+        if fila is None:
+            continue
+        fila.detalle = [linea.a_dict() for linea in doc.lineas]
+        actualizados += 1
+    db.flush()
+    return actualizados
+
+
+def sincronizar_detalle_ventas(
+    *,
+    rut: str,
+    clave_tributaria: str,
+    fecha_desde: date,
+    fecha_hasta: date,
+    sync_id: int | None = None,
+    settings: Settings | None = None,
+) -> ResultadoSync:
+    """Trae la glosa de las ventas ya descargadas por el RCV, vía el MIPYME.
+
+    Sólo sirve para documentos emitidos con el facturador gratuito del SII.
+    Requiere haber corrido ``sincronizar`` antes para ese rango: este flujo
+    actualiza documentos existentes, no crea nuevos.
+    """
+    settings = settings or get_settings()
+    rut_titular = str(parse_rut(rut))
+    resultado = ResultadoSync()
+
+    _marcar(sync_id, estado="corriendo")
+
+    if settings.modo == "demo":
+        with sesion_db() as db:
+            filas = list(
+                db.scalars(
+                    select(Documento).where(
+                        Documento.rut_titular == rut_titular,
+                        Documento.operacion == ep.VENTA,
+                        Documento.periodo >= f"{fecha_desde:%Y%m}",
+                        Documento.periodo <= f"{fecha_hasta:%Y%m}",
+                    )
+                )
+            )
+            for fila in filas:
+                doc = DocumentoSII(
+                    operacion=ep.VENTA,
+                    periodo=fila.periodo,
+                    estado_contab=fila.estado_contab,
+                    tipo_doc=fila.tipo_doc,
+                    folio=fila.folio,
+                    monto_neto=fila.monto_neto,
+                    monto_exento=fila.monto_exento,
+                )
+                fila.detalle = detalle_demo(doc)
+            resultado.actualizados = len(filas)
+        resultado.avisos.append("Modo demo: la glosa es de ejemplo, no viene del SII.")
+        _marcar(sync_id, estado="ok", resultado=resultado)
+        return resultado
+
+    detalle = descargar_detalle_ventas(
+        rut_titular,
+        clave_tributaria,
+        fecha_desde,
+        fecha_hasta,
+        headless=settings.headless,
+        timeout_ms=settings.timeout_ms,
+        user_agent=settings.user_agent,
+        ruta_navegador=settings.ruta_navegador,
+    )
+    resultado.avisos.extend(detalle.avisos)
+    with sesion_db() as db:
+        resultado.actualizados = guardar_detalle_ventas(db, rut_titular, detalle.documentos)
+
+    _marcar(sync_id, estado="ok", resultado=resultado)
+    return resultado
+
+
+def sincronizar_detalle_ventas_en_segundo_plano(**kwargs) -> None:
+    """Envoltorio para BackgroundTasks: registra el error en el trabajo."""
+    sync_id = kwargs.get("sync_id")
+    try:
+        sincronizar_detalle_ventas(**kwargs)
+    except Exception as exc:  # noqa: BLE001 - el detalle queda en el trabajo
+        log.exception("Falló la sincronización de detalle de ventas %s", sync_id)
+        _marcar(sync_id, estado="error", mensaje=str(exc))
 
 
 def sincronizar_en_segundo_plano(**kwargs) -> None:

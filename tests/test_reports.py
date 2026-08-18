@@ -128,3 +128,52 @@ def test_lote_con_el_mismo_documento_repetido(db):
     db.commit()
     assert nuevos == 1
     assert reports.listar_documentos(db, reports.Filtro(TITULAR))[1] == 1
+
+
+def test_guardar_detalle_ventas_actualiza_documento_existente(db):
+    from app.services.sync import guardar_detalle_ventas
+    from app.sii.mipe_parser import DocumentoEmitido, LineaDetalle
+
+    original = _doc(ep.VENTA, "202403", 33, 555, 1_000_000, 190_000)
+    guardar_documentos(db, TITULAR, [original], "csv")
+    db.commit()
+
+    detalle = DocumentoEmitido(
+        tipo_doc=33,
+        folio=555,
+        fecha_emision=None,
+        rut_receptor="77345612-7",
+        razon_social_receptor="PROVEEDOR SPA",
+        monto_neto=Decimal("1000000"),
+        monto_exento=Decimal(0),
+        monto_iva=Decimal("190000"),
+        monto_total=Decimal("1190000"),
+        lineas=[
+            LineaDetalle(1, "", "Servicio de prueba", Decimal("1.00"), Decimal("1000000"), Decimal("1000000"))
+        ],
+    )
+    actualizados = guardar_detalle_ventas(db, TITULAR, [detalle])
+    db.commit()
+
+    assert actualizados == 1
+    fila = reports.listar_documentos(db, reports.Filtro(TITULAR))[0][0]
+    assert fila.tiene_detalle
+    assert fila.detalle[0]["descripcion"] == "Servicio de prueba"
+
+
+def test_guardar_detalle_ventas_ignora_documento_sin_coincidencia(db):
+    from app.services.sync import guardar_detalle_ventas
+    from app.sii.mipe_parser import DocumentoEmitido
+
+    detalle = DocumentoEmitido(
+        tipo_doc=33,
+        folio=99999,
+        fecha_emision=None,
+        rut_receptor="",
+        razon_social_receptor="",
+        monto_neto=Decimal(0),
+        monto_exento=Decimal(0),
+        monto_iva=Decimal(0),
+        monto_total=Decimal(0),
+    )
+    assert guardar_detalle_ventas(db, TITULAR, [detalle]) == 0

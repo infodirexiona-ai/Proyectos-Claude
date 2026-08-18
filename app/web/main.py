@@ -92,6 +92,17 @@ def _titular_activo(db: Session, rut: str | None) -> str | None:
     return primera.rut_titular if primera else None
 
 
+def _entero_opcional(valor: str | None) -> int | None:
+    """Convierte a int, tratando "" (lo que manda un <select> en "Todos") como ausente.
+
+    FastAPI/Pydantic no acepta "" para un parámetro declarado ``int | None``:
+    lo intenta parsear como entero y falla. Los filtros de la web mandan sus
+    campos vacíos como "" en vez de omitirlos, así que las rutas reciben el
+    valor crudo como texto y lo convierten con esta función.
+    """
+    return int(valor) if valor else None
+
+
 def _filtro(
     titular: str,
     desde: str | None = None,
@@ -136,7 +147,7 @@ def vista_documentos(
     desde: str | None = Query(None),
     hasta: str | None = Query(None),
     operacion: str | None = Query(None),
-    tipo_doc: int | None = Query(None),
+    tipo_doc: str | None = Query(None),
     contraparte: str | None = Query(None),
     q: str | None = Query(None),
     orden: str = Query("fecha"),
@@ -157,7 +168,7 @@ def vista_documentos(
         )
 
     por_pagina = 100
-    filtro = _filtro(activo, desde, hasta, operacion, tipo_doc, contraparte, q)
+    filtro = _filtro(activo, desde, hasta, operacion, _entero_opcional(tipo_doc), contraparte, q)
     try:
         documentos, total = reports.listar_documentos(
             db, filtro, limite=por_pagina, offset=(pagina - 1) * por_pagina, orden=orden
@@ -242,11 +253,13 @@ def exportar_excel(
     desde: str | None = Query(None),
     hasta: str | None = Query(None),
     operacion: str | None = Query(None),
-    tipo_doc: int | None = Query(None),
+    tipo_doc: str | None = Query(None),
     contraparte: str | None = Query(None),
     q: str | None = Query(None),
 ):
-    filtro = _filtro_de_exportacion(db, titular, desde, hasta, operacion, tipo_doc, contraparte, q)
+    filtro = _filtro_de_exportacion(
+        db, titular, desde, hasta, operacion, _entero_opcional(tipo_doc), contraparte, q
+    )
     buffer = export.excel_documentos(db, filtro)
     nombre = export.nombre_archivo(filtro, "xlsx")
     return StreamingResponse(
@@ -263,11 +276,13 @@ def exportar_csv(
     desde: str | None = Query(None),
     hasta: str | None = Query(None),
     operacion: str | None = Query(None),
-    tipo_doc: int | None = Query(None),
+    tipo_doc: str | None = Query(None),
     contraparte: str | None = Query(None),
     q: str | None = Query(None),
 ):
-    filtro = _filtro_de_exportacion(db, titular, desde, hasta, operacion, tipo_doc, contraparte, q)
+    filtro = _filtro_de_exportacion(
+        db, titular, desde, hasta, operacion, _entero_opcional(tipo_doc), contraparte, q
+    )
     contenido = export.csv_documentos(db, filtro).getvalue()
     nombre = export.nombre_archivo(filtro, "csv")
     return StreamingResponse(

@@ -234,3 +234,21 @@ def test_credencial_sin_rut_de_acceso_usa_el_mismo_rut(cliente):
         credencial = db.scalars(select(Credencial)).one()
         assert credencial.rut_titular == RUT
         assert credencial.rut == RUT
+
+
+def test_filtro_tipo_doc_vacio_no_revienta(cliente_con_datos):
+    """El <select> de "Tipo" manda tipo_doc="" cuando está en "Todos" — antes
+    esto hacía que FastAPI intentara parsearlo como entero y fallara con 422."""
+    respuesta = cliente_con_datos.get("/documentos", params={"titular": RUT, "tipo_doc": ""})
+    assert respuesta.status_code == 200
+
+    respuesta = cliente_con_datos.get("/exportar.xlsx", params={"titular": RUT, "tipo_doc": ""})
+    assert respuesta.status_code == 200
+
+    respuesta = cliente_con_datos.get("/exportar.csv", params={"titular": RUT, "tipo_doc": ""})
+    assert respuesta.status_code == 200
+
+
+def test_filtro_tipo_doc_con_valor_sigue_funcionando(cliente_con_datos):
+    respuesta = cliente_con_datos.get("/documentos", params={"titular": RUT, "tipo_doc": "33"})
+    assert respuesta.status_code == 200

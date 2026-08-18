@@ -136,16 +136,24 @@ def sincronizar(
     periodos: list[str],
     operaciones: tuple[str, ...] = (ep.COMPRA, ep.VENTA),
     estados: tuple[str, ...] = (ep.REGISTRO,),
+    rut_login: str | None = None,
     sync_id: int | None = None,
     settings: Settings | None = None,
 ) -> ResultadoSync:
     """Descarga los periodos indicados y los deja guardados en la base.
 
+    ``rut`` es de quién son los documentos (el titular). ``rut_login`` es con
+    quién se inicia sesión en el SII, si es distinto — por ejemplo, el
+    representante legal de una empresa. Si no se indica, se asume que son el
+    mismo RUT (el caso más común).
+
     En modo ``demo`` no se conecta al SII: usa datos de ejemplo. Es la forma de
     probar la interfaz y los reportes sin credenciales reales.
     """
     settings = settings or get_settings()
-    rut_titular = str(parse_rut(rut))
+    rut_obj_titular = parse_rut(rut)
+    rut_titular = str(rut_obj_titular)
+    rut_obj_login = parse_rut(rut_login) if rut_login else rut_obj_titular
     resultado = ResultadoSync()
 
     _marcar(sync_id, estado="corriendo")
@@ -163,7 +171,7 @@ def sincronizar(
         return resultado
 
     sesion = iniciar_sesion(
-        rut_titular,
+        str(rut_obj_login),
         clave_tributaria,
         headless=settings.headless,
         timeout_ms=settings.timeout_ms,
@@ -171,7 +179,7 @@ def sincronizar(
         ruta_navegador=settings.ruta_navegador,
     )
     try:
-        cliente = ClienteRCV(sesion, pausa=settings.pausa_entre_llamadas)
+        cliente = ClienteRCV(sesion, pausa=settings.pausa_entre_llamadas, rut_titular=rut_obj_titular)
         for periodo in periodos:
             for operacion in operaciones:
                 for estado in estados:
@@ -241,6 +249,7 @@ def sincronizar_detalle_ventas(
     clave_tributaria: str,
     fecha_desde: date,
     fecha_hasta: date,
+    rut_login: str | None = None,
     sync_id: int | None = None,
     settings: Settings | None = None,
 ) -> ResultadoSync:
@@ -249,9 +258,13 @@ def sincronizar_detalle_ventas(
     Sólo sirve para documentos emitidos con el facturador gratuito del SII.
     Requiere haber corrido ``sincronizar`` antes para ese rango: este flujo
     actualiza documentos existentes, no crea nuevos.
+
+    ``rut_login`` es con quién se inicia sesión, si es distinto del titular
+    (ver ``sincronizar``).
     """
     settings = settings or get_settings()
     rut_titular = str(parse_rut(rut))
+    rut_para_login = str(parse_rut(rut_login)) if rut_login else rut_titular
     resultado = ResultadoSync()
 
     _marcar(sync_id, estado="corriendo")
@@ -285,7 +298,7 @@ def sincronizar_detalle_ventas(
         return resultado
 
     detalle = descargar_detalle_ventas(
-        rut_titular,
+        rut_para_login,
         clave_tributaria,
         fecha_desde,
         fecha_hasta,

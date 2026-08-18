@@ -176,3 +176,61 @@ def test_detalle_ventas_rut_invalido(cliente):
         "/sincronizar-detalle-ventas", data={"rut": "12345678-9", "desde": "202403", "hasta": "202403"}
     )
     assert respuesta.status_code == 400
+
+
+def test_credencial_con_rut_de_acceso_distinto(cliente):
+    """El representante legal (11433270-4) puede guardar la credencial de una
+    empresa (76655600-0) que representa, con su propio RUT de acceso."""
+    from sqlalchemy import select
+
+    cliente.post(
+        "/credenciales",
+        data={"rut": "76655600-0", "rut_acceso": "11433270-4", "clave": "clave-del-representante"},
+    )
+    pagina = cliente.get("/credenciales")
+    assert "76655600-0" in pagina.text
+    assert "11433270-4" in pagina.text
+
+    from app.db import SessionLocal
+    from app.models import Credencial
+
+    with SessionLocal() as db:
+        credencial = db.scalars(select(Credencial)).one()
+        assert credencial.rut_titular == "76655600-0"
+        assert credencial.rut == "11433270-4"
+        assert credencial.clave_cifrada != "clave-del-representante"
+
+
+def test_dos_empresas_con_el_mismo_representante(cliente):
+    """Una misma persona puede guardar credenciales para más de una empresa."""
+    from sqlalchemy import select
+
+    cliente.post("/credenciales", data={"rut": "76655600-0", "rut_acceso": "11433270-4", "clave": "clave1"})
+    respuesta = cliente.post(
+        "/credenciales",
+        data={"rut": "76760089-5", "rut_acceso": "11433270-4", "clave": "clave2"},
+        follow_redirects=False,
+    )
+    assert respuesta.status_code == 303
+
+    from app.db import SessionLocal
+    from app.models import Credencial
+
+    with SessionLocal() as db:
+        filas = db.scalars(select(Credencial)).all()
+        assert {f.rut_titular for f in filas} == {"76655600-0", "76760089-5"}
+        assert {f.rut for f in filas} == {"11433270-4"}
+
+
+def test_credencial_sin_rut_de_acceso_usa_el_mismo_rut(cliente):
+    from sqlalchemy import select
+
+    cliente.post("/credenciales", data={"rut": RUT, "clave": "clave-propia"})
+
+    from app.db import SessionLocal
+    from app.models import Credencial
+
+    with SessionLocal() as db:
+        credencial = db.scalars(select(Credencial)).one()
+        assert credencial.rut_titular == RUT
+        assert credencial.rut == RUT

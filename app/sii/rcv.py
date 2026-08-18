@@ -15,6 +15,7 @@ import uuid
 
 import httpx
 
+from ..rut import Rut
 from . import endpoints as ep
 from .errors import RespuestaInesperada, SesionExpirada
 from .modelos import DocumentoSII, ResumenTipoDoc
@@ -25,11 +26,19 @@ log = logging.getLogger(__name__)
 
 
 class ClienteRCV:
-    """Consultas al Registro de Compras y Ventas sobre una sesión autenticada."""
+    """Consultas al Registro de Compras y Ventas sobre una sesión autenticada.
 
-    def __init__(self, sesion: SesionPortal, *, pausa: float = 0.8):
+    ``rut_titular`` es de quién se piden los documentos, y puede ser distinto
+    del RUT con el que se inició sesión: el SII siempre autentica a una
+    persona natural, que puede representar a una o más empresas. Si no se
+    indica, se asume que la sesión ya representa al RUT que se quiere
+    consultar (el caso más común: alguien consultando sus propios documentos).
+    """
+
+    def __init__(self, sesion: SesionPortal, *, pausa: float = 0.8, rut_titular: Rut | None = None):
         self.sesion = sesion
         self.pausa = pausa
+        self.rut_titular = rut_titular or sesion.rut
         self._inicializada = False
 
     # --- Infraestructura ---------------------------------------------------
@@ -106,8 +115,8 @@ class ClienteRCV:
         recaptcha: bool = False,
     ) -> dict:
         data: dict = {
-            "rutEmisor": str(self.sesion.rut.cuerpo),
-            "dvEmisor": self.sesion.rut.dv,
+            "rutEmisor": str(self.rut_titular.cuerpo),
+            "dvEmisor": self.rut_titular.dv,
             "ptributario": periodo,
             "operacion": operacion,
             "estadoContab": estado_contab,

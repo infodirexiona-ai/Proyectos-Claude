@@ -59,8 +59,8 @@ plantillas.env.filters.update(FILTROS)
 # --- Utilidades compartidas -------------------------------------------------
 def _contexto(request: Request, db: Session, **extra) -> dict:
     settings = get_settings()
-    credenciales = list(db.scalars(select(Credencial).order_by(Credencial.rut)))
-    titulares = sorted({*reports.titulares(db), *(c.rut for c in credenciales)})
+    credenciales = list(db.scalars(select(Credencial).order_by(Credencial.rut_titular)))
+    titulares = sorted({*reports.titulares(db), *(c.rut_titular for c in credenciales)})
     contexto = {
         "modo": settings.modo,
         "version": __version__,
@@ -89,7 +89,7 @@ def _titular_activo(db: Session, rut: str | None) -> str | None:
     if candidatos:
         return candidatos[0]
     primera = db.scalars(select(Credencial).order_by(Credencial.id)).first()
-    return primera.rut if primera else None
+    return primera.rut_titular if primera else None
 
 
 def _filtro(
@@ -306,6 +306,7 @@ def lanzar_sincronizacion(
     compras: str | None = Form(None),
     ventas: str | None = Form(None),
     clave: str | None = Form(None),
+    rut_acceso: str | None = Form(None),
 ):
     settings = get_settings()
     try:
@@ -322,8 +323,9 @@ def lanzar_sincronizacion(
     ) or (ep.COMPRA, ep.VENTA)
 
     clave_final = (clave or "").strip()
+    rut_login = (rut_acceso or "").strip() or None
     if not clave_final and settings.modo != "demo":
-        clave_final = _clave_guardada(db, rut_titular, settings)
+        rut_login, clave_final = _clave_guardada(db, rut_titular, settings)
 
     trabajo = Sincronizacion(
         rut_titular=rut_titular,
@@ -341,6 +343,7 @@ def lanzar_sincronizacion(
         clave_tributaria=clave_final,
         periodos=periodos,
         operaciones=operaciones,
+        rut_login=rut_login,
         sync_id=trabajo.id,
     )
     return RedirectResponse(url="/sincronizaciones", status_code=303)
@@ -354,6 +357,7 @@ def lanzar_sincronizacion_detalle_ventas(
     desde: str = Form(...),
     hasta: str = Form(...),
     clave: str | None = Form(None),
+    rut_acceso: str | None = Form(None),
 ):
     """Trae la glosa de ventas ya descargadas por el RCV, vía el MIPYME.
 
@@ -374,8 +378,9 @@ def lanzar_sincronizacion_detalle_ventas(
     fecha_hasta = date(int(periodo_hasta[:4]), int(periodo_hasta[4:]), ultimo_dia)
 
     clave_final = (clave or "").strip()
+    rut_login = (rut_acceso or "").strip() or None
     if not clave_final and settings.modo != "demo":
-        clave_final = _clave_guardada(db, rut_titular, settings)
+        rut_login, clave_final = _clave_guardada(db, rut_titular, settings)
 
     trabajo = Sincronizacion(
         rut_titular=rut_titular,
@@ -393,23 +398,28 @@ def lanzar_sincronizacion_detalle_ventas(
         clave_tributaria=clave_final,
         fecha_desde=fecha_desde,
         fecha_hasta=fecha_hasta,
+        rut_login=rut_login,
         sync_id=trabajo.id,
     )
     return RedirectResponse(url="/sincronizaciones", status_code=303)
 
 
-def _clave_guardada(db: Session, rut_titular: str, settings) -> str:
-    """Recupera la clave tributaria cifrada, o la del ``.env`` si corresponde."""
-    credencial = db.scalars(select(Credencial).where(Credencial.rut == rut_titular)).first()
+def _clave_guardada(db: Session, rut_titular: str, settings) -> tuple[str, str]:
+    """Recupera con quién iniciar sesión y la clave tributaria para un titular.
+
+    Devuelve ``(rut_login, clave)``. ``rut_login`` puede ser distinto del
+    titular cuando la credencial guardada es la de un representante legal.
+    """
+    credencial = db.scalars(select(Credencial).where(Credencial.rut_titular == rut_titular)).first()
     if credencial:
         try:
-            return descifrar(credencial.clave_cifrada, settings.clave_cifrado)
+            return credencial.rut, descifrar(credencial.clave_cifrada, settings.clave_cifrado)
         except (ClaveCifradoAusente, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     if settings.clave_tributaria and settings.rut:
         try:
             if str(parse_rut(settings.rut)) == rut_titular:
-                return settings.clave_tributaria
+                return rut_titular, settings.clave_tributaria
         except RutInvalido:
             pass
     raise HTTPException(
@@ -437,17 +447,25 @@ def guardar_credencial(
     rut: str = Form(...),
     clave: str = Form(...),
     alias: str = Form(""),
+    rut_acceso: str = Form(""),
 ):
+    """Guarda una credencial. ``rut`` es el titular (de quién son los
+    documentos); ``rut_acceso`` es con quién se inicia sesión, si es distinto
+    (por ejemplo, el representante legal de una empresa). Si se deja en
+    blanco, se asume que son el mismo RUT.
+    """
     try:
         rut_titular = str(parse_rut(rut))
+        rut_login = str(parse_rut(rut_acceso)) if rut_acceso.strip() else rut_titular
         cifrada = cifrar(clave, get_settings().clave_cifrado)
     except (RutInvalido, ClaveCifradoAusente) as exc:
         return RedirectResponse(url=f"/credenciales?error={exc}", status_code=303)
 
-    credencial = db.scalars(select(Credencial).where(Credencial.rut == rut_titular)).first()
+    credencial = db.scalars(select(Credencial).where(Credencial.rut_titular == rut_titular)).first()
     if credencial is None:
-        credencial = Credencial(rut=rut_titular)
+        credencial = Credencial(rut_titular=rut_titular)
         db.add(credencial)
+    credencial.rut = rut_login
     credencial.clave_cifrada = cifrada
     credencial.alias = alias.strip()
     db.commit()

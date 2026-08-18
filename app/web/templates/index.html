@@ -7,7 +7,7 @@
   <form method="post" action="/sincronizar" class="formulario-linea">
     <label>RUT
       <input type="text" name="rut" required placeholder="76.123.456-7"
-             value="{{ titular or (credenciales[0].rut if credenciales else '') }}">
+             value="{{ titular or (credenciales[0].rut_titular if credenciales else '') }}">
     </label>
     <label>Desde <input type="text" name="desde" required placeholder="AAAAMM" value="{{ periodo_actual }}"></label>
     <label>Hasta <input type="text" name="hasta" required placeholder="AAAAMM" value="{{ periodo_actual }}"></label>

@@ -10,26 +10,36 @@
   <p class="nota">La clave tributaria se guarda cifrada (Fernet) con <code>SII_CLAVE_CIFRADO</code>. Nunca se muestra ni se escribe en los logs.</p>
 
   <form method="post" action="/credenciales" class="formulario-linea">
-    <label>RUT <input type="text" name="rut" required placeholder="76.123.456-7"></label>
+    <label>RUT (titular) <input type="text" name="rut" required placeholder="76.123.456-7"></label>
+    <label>RUT de acceso <input type="text" name="rut_acceso" placeholder="(igual al titular si no aplica)"></label>
     <label>Clave tributaria <input type="password" name="clave" required></label>
     <label>Alias <input type="text" name="alias" placeholder="Mi empresa"></label>
     <button type="submit">Guardar</button>
   </form>
+  <p class="nota">
+    El SII siempre autentica a una persona natural, que puede representar una o más empresas.
+    Si te autenticas con tu propio RUT para ver los documentos de una empresa que representas,
+    pon el RUT de la <strong>empresa</strong> en "RUT (titular)" y tu RUT personal en
+    "RUT de acceso". Si son la misma persona, deja "RUT de acceso" en blanco.
+  </p>
 
   <table class="tabla">
-    <thead><tr><th>RUT</th><th>Alias</th><th>Actualizada</th><th></th></tr></thead>
+    <thead><tr><th>Titular</th><th>Acceso</th><th>Alias</th><th>Actualizada</th><th></th></tr></thead>
     <tbody>
       {% for c in credenciales %}
       <tr>
-        <td>{{ c.rut }}</td><td>{{ c.alias or '—' }}</td><td>{{ c.actualizado | fecha }}</td>
+        <td>{{ c.rut_titular }}</td>
+        <td>{{ c.rut if c.rut != c.rut_titular else '—' }}</td>
+        <td>{{ c.alias or '—' }}</td>
+        <td>{{ c.actualizado | fecha }}</td>
         <td>
-          <form method="post" action="/credenciales/{{ c.id }}/eliminar" onsubmit="return confirm('¿Eliminar la credencial de {{ c.rut }}?')">
+          <form method="post" action="/credenciales/{{ c.id }}/eliminar" onsubmit="return confirm('¿Eliminar la credencial de {{ c.rut_titular }}?')">
             <button type="submit" class="boton-peligro">Eliminar</button>
           </form>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="4" class="vacio">No hay credenciales guardadas.</td></tr>
+      <tr><td colspan="5" class="vacio">No hay credenciales guardadas.</td></tr>
       {% endfor %}
     </tbody>
   </table>

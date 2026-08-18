@@ -29,12 +29,23 @@ class Base(DeclarativeBase):
 
 
 class Credencial(Base):
-    """Credenciales del contribuyente. La clave se guarda cifrada (Fernet)."""
+    """Credenciales para autenticarse en el SII. La clave se guarda cifrada (Fernet).
+
+    ``rut`` es con quién se inicia sesión (RUT + clave tributaria que el SII
+    valida). ``rut_titular`` es de quién son los documentos que se quieren
+    descargar. La mayoría de las veces son el mismo RUT, pero el SII siempre
+    autentica a una persona natural, y esa persona puede representar a una o
+    más empresas — el representante legal de una sociedad inicia sesión con
+    su propio RUT y clave, no con los de la empresa. Por eso ``rut_titular``
+    es la clave de búsqueda (única): puede haber varias credenciales con el
+    mismo ``rut`` de acceso, una por cada empresa que esa persona representa.
+    """
 
     __tablename__ = "credenciales"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    rut: Mapped[str] = mapped_column(String(20), unique=True, index=True)
+    rut: Mapped[str] = mapped_column(String(20), index=True)
+    rut_titular: Mapped[str] = mapped_column(String(20), unique=True, index=True)
     alias: Mapped[str] = mapped_column(String(120), default="")
     clave_cifrada: Mapped[str] = mapped_column(Text)
     creado: Mapped[datetime] = mapped_column(DateTime, default=_ahora)

@@ -47,12 +47,37 @@ def _migrar_columnas_nuevas() -> None:
     van sumando entre versiones se agregan aquí a mano, sin tocar los datos.
     """
     inspector = inspect(engine)
-    if "documentos" not in inspector.get_table_names():
-        return
-    columnas = {c["name"] for c in inspector.get_columns("documentos")}
-    if "detalle" not in columnas:
-        with engine.begin() as conexion:
-            conexion.execute(text("ALTER TABLE documentos ADD COLUMN detalle JSON"))
+    tablas = inspector.get_table_names()
+
+    if "documentos" in tablas:
+        columnas = {c["name"] for c in inspector.get_columns("documentos")}
+        if "detalle" not in columnas:
+            with engine.begin() as conexion:
+                conexion.execute(text("ALTER TABLE documentos ADD COLUMN detalle JSON"))
+
+    if "credenciales" in tablas:
+        columnas = {c["name"] for c in inspector.get_columns("credenciales")}
+        if "rut_titular" not in columnas:
+            with engine.begin() as conexion:
+                # Antes, una credencial sólo servía para el RUT con el que se
+                # inicia sesión. Al agregar rut_titular (la empresa cuyos
+                # documentos se piden, que puede ser otro RUT si quien firma es
+                # un representante legal), las credenciales existentes quedan
+                # apuntando a sí mismas, tal como funcionaban hasta ahora.
+                conexion.execute(text("ALTER TABLE credenciales ADD COLUMN rut_titular VARCHAR(20)"))
+                conexion.execute(text("UPDATE credenciales SET rut_titular = rut WHERE rut_titular IS NULL"))
+                # El esquema anterior exigía "rut" único: eso impedía que una misma
+                # persona (rut de acceso) guardara credenciales para más de una
+                # empresa. Se cambia esa restricción a rut_titular, que es la que
+                # tiene que ser única de verdad.
+                conexion.execute(text("DROP INDEX IF EXISTS ix_credenciales_rut"))
+                conexion.execute(text("CREATE INDEX IF NOT EXISTS ix_credenciales_rut ON credenciales (rut)"))
+                conexion.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS ix_credenciales_rut_titular "
+                        "ON credenciales (rut_titular)"
+                    )
+                )
 
 
 @contextmanager

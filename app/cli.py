@@ -31,30 +31,40 @@ from .sii import endpoints as ep
 from .web.formato import clp
 
 
-def _clave_para(rut: str, pedir: bool) -> str:
+def _clave_para(rut_titular: str, pedir: bool) -> tuple[str, str]:
+    """Devuelve ``(rut_login, clave)`` para el RUT titular indicado.
+
+    ``rut_login`` puede ser distinto del titular si la credencial guardada es
+    la de un representante legal (el SII siempre autentica a una persona
+    natural, que puede representar una o más empresas).
+    """
     settings = get_settings()
     if settings.modo == "demo":
-        return ""
+        return rut_titular, ""
     with SessionLocal() as db:
-        credencial = db.scalars(select(Credencial).where(Credencial.rut == rut)).first()
+        credencial = db.scalars(select(Credencial).where(Credencial.rut_titular == rut_titular)).first()
         if credencial:
-            return descifrar(credencial.clave_cifrada, settings.clave_cifrado)
-    if settings.clave_tributaria and settings.rut and str(parse_rut(settings.rut)) == rut:
-        return settings.clave_tributaria
+            return credencial.rut, descifrar(credencial.clave_cifrada, settings.clave_cifrado)
+    if settings.clave_tributaria and settings.rut and str(parse_rut(settings.rut)) == rut_titular:
+        return rut_titular, settings.clave_tributaria
     if pedir and sys.stdin.isatty():
-        return getpass(f"Clave tributaria de {rut}: ")
-    raise SystemExit(f"No hay clave tributaria para {rut}. Guárdala en la app o define SII_CLAVE_TRIBUTARIA.")
+        return rut_titular, getpass(f"Clave tributaria de {rut_titular}: ")
+    raise SystemExit(
+        f"No hay clave tributaria para {rut_titular}. Guárdala en la app o define SII_CLAVE_TRIBUTARIA."
+    )
 
 
 def _cmd_sincronizar(args) -> int:
     rut = str(parse_rut(args.rut))
     periodos = rango_periodos(args.desde, args.hasta or args.desde)
     operaciones = tuple(o for o in (ep.COMPRA, ep.VENTA) if getattr(args, o.lower()))
+    rut_login, clave = _clave_para(rut, pedir=True)
     resultado = sincronizar(
         rut=rut,
-        clave_tributaria=_clave_para(rut, pedir=True),
+        clave_tributaria=clave,
         periodos=periodos,
         operaciones=operaciones or (ep.COMPRA, ep.VENTA),
+        rut_login=rut_login,
     )
     print(f"Periodos: {periodos[0]} → {periodos[-1]}")
     print(f"Nuevos: {resultado.nuevos} · Actualizados: {resultado.actualizados}")
@@ -108,11 +118,13 @@ def _cmd_detalle_ventas(args) -> int:
     ultimo_dia = calendar.monthrange(int(periodo_hasta[:4]), int(periodo_hasta[4:]))[1]
     fecha_hasta = date(int(periodo_hasta[:4]), int(periodo_hasta[4:]), ultimo_dia)
 
+    rut_login, clave = _clave_para(rut, pedir=True)
     resultado = sincronizar_detalle_ventas(
         rut=rut,
-        clave_tributaria=_clave_para(rut, pedir=True),
+        clave_tributaria=clave,
         fecha_desde=fecha_desde,
         fecha_hasta=fecha_hasta,
+        rut_login=rut_login,
     )
     print(f"Periodos: {periodo_desde} → {periodo_hasta}")
     print(f"Documentos con glosa actualizada: {resultado.actualizados}")

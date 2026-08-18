@@ -37,6 +37,8 @@ COLUMNAS_DOCUMENTOS = [
     ("IVA uso común", "iva_uso_comun", _FORMATO_MONEDA),
     ("Otros impuestos", "otros_impuestos", _FORMATO_MONEDA),
     ("Estado", "estado_contab", None),
+    ("Glosa (resumen)", "glosa_resumida", None),
+    ("Glosa (detalle)", "glosa_extendida", None),
 ]
 
 

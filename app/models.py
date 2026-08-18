@@ -98,10 +98,12 @@ class Documento(Base):
     origen: Mapped[str] = mapped_column(String(10), default="csv")  # csv | json | demo
     raw: Mapped[dict] = mapped_column(JSON, default=dict)
 
-    # Detalle línea por línea (glosa, cantidad, precio) de documentos que el
-    # propio contribuyente emitió con el facturador gratuito del SII. El RCV no
-    # lo trae; se completa aparte, vía app.sii.mipe, sólo para VENTA. Lista de
-    # {codigo, descripcion, cantidad, precio, monto}.
+    # Detalle línea por línea de documentos que el propio contribuyente emitió
+    # con el facturador gratuito del SII. El RCV no lo trae; se completa
+    # aparte, vía app.sii.mipe, sólo para VENTA. Lista de {numero, codigo,
+    # nombre_corto, descripcion_larga, cantidad, precio, monto} — nombre_corto
+    # y descripcion_larga son dos campos separados del SII (NmbItem/DscItem),
+    # no un texto único.
     detalle: Mapped[list] = mapped_column(JSON, default=list)
 
     creado: Mapped[datetime] = mapped_column(DateTime, default=_ahora)
@@ -118,6 +120,21 @@ class Documento(Base):
     @property
     def tiene_detalle(self) -> bool:
         return bool(self.detalle)
+
+    def _unir_lineas(self, campo: str) -> str:
+        if not self.detalle:
+            return ""
+        return "; ".join(linea.get(campo, "") for linea in self.detalle if linea.get(campo))
+
+    @property
+    def glosa_resumida(self) -> str:
+        """Nombre corto de cada línea (``NmbItem``), unido para exportar."""
+        return self._unir_lineas("nombre_corto")
+
+    @property
+    def glosa_extendida(self) -> str:
+        """Descripción larga de cada línea (``DscItem``), unida para exportar."""
+        return self._unir_lineas("descripcion_larga")
 
 
 class Sincronizacion(Base):

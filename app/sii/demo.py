@@ -72,24 +72,28 @@ def documentos_demo(periodo: str, operacion: str, estado_contab: str = ep.REGIST
     return documentos
 
 
+# (nombre corto, descripción larga) — igual que en el SII, la descripción
+# larga es opcional; algunas líneas sólo tienen el nombre corto.
 _GLOSAS = [
-    "Servicios de consultoría en gestión, según lo acordado con el cliente.",
-    "Desarrollo de plan de difusión en medios y gestión de redes sociales.",
-    "Formación y capacitación de personal según especificaciones técnicas adjuntas.",
-    "Arriendo mensual de oficina, incluye gastos comunes.",
-    "Venta de mercadería según guía de despacho adjunta.",
-    "Servicios profesionales de marketing digital, mes en curso.",
+    ("Servicios de consultoría en gestión", "según lo acordado con el cliente."),
+    ("Desarrollo de plan de difusión", "en medios y gestión de redes sociales."),
+    ("Formación y capacitación de personal", "según especificaciones técnicas adjuntas."),
+    ("Arriendo mensual de oficina", ""),
+    ("Venta de mercadería", "según guía de despacho adjunta."),
+    ("Servicios profesionales de marketing digital", ""),
 ]
 
 
 def detalle_demo(documento: DocumentoSII) -> list[dict]:
     """Una línea de detalle de ejemplo, coherente con el monto del documento."""
     rnd = random.Random(f"{documento.periodo}:{documento.operacion}:{documento.folio}")
+    nombre_corto, descripcion_larga = rnd.choice(_GLOSAS)
     return [
         {
             "numero": 1,
             "codigo": "",
-            "descripcion": rnd.choice(_GLOSAS),
+            "nombre_corto": nombre_corto,
+            "descripcion_larga": descripcion_larga,
             "cantidad": "1.00",
             "precio": str(documento.monto_neto or documento.monto_exento),
             "monto": str(documento.monto_neto or documento.monto_exento),

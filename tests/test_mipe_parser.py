@@ -133,8 +133,22 @@ def test_documento_con_varias_lineas_de_detalle():
 def test_linea_a_dict_es_serializable():
     doc = parsear_respaldo_mipyme(XML_EJEMPLO)[0]
     bruto = doc.lineas[0].a_dict()
-    assert bruto["descripcion"] == "Asesoría empresarial"
+    assert bruto["nombre_corto"] == "Asesoría empresarial"
+    assert bruto["descripcion_larga"] == ""
     assert bruto["monto"] == "300000"
+
+
+def test_nombre_corto_y_descripcion_larga_quedan_separados():
+    """NmbItem y DscItem se guardan aparte, no sólo unidos en un texto."""
+    doc = parsear_respaldo_mipyme(XML_EJEMPLO)[1]
+    linea = doc.lineas[0]
+    assert linea.nombre_corto == "Desarrollo Plan difusión"
+    assert linea.descripcion_larga == (
+        "en medios y gestión de redes sociales. "
+        "Proyecto Chacabuco, Territorio Encadenado Productivamente Codigo 24VIRM2-265619"
+    )
+    # .descripcion sigue disponible como conveniencia: ambas juntas.
+    assert linea.descripcion == f"{linea.nombre_corto} {linea.descripcion_larga}"
 
 
 def test_xml_vacio_o_invalido():

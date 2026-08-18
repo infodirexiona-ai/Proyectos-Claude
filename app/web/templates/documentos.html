@@ -86,7 +86,9 @@
             <summary>Ver ({{ d.detalle | length }})</summary>
             <ul>
               {% for linea in d.detalle %}
-              <li>{{ linea.descripcion }}
+              <li>
+                <strong>{{ linea.nombre_corto }}</strong>
+                {%- if linea.descripcion_larga %} {{ linea.descripcion_larga }}{% endif %}
                 {%- if linea.cantidad and linea.cantidad != '1.00' %} — {{ linea.cantidad }} x {{ linea.precio | clp }}{% endif %}
               </li>
               {% endfor %}

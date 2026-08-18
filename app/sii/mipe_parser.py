@@ -23,16 +23,25 @@ from .parsers import a_decimal, a_fecha
 class LineaDetalle:
     numero: int
     codigo: str
-    descripcion: str
+    nombre_corto: str
+    descripcion_larga: str
     cantidad: Decimal
     precio: Decimal
     monto: Decimal
+
+    @property
+    def descripcion(self) -> str:
+        """Nombre corto y descripción larga juntos, tal como se ve en el PDF."""
+        if self.nombre_corto and self.descripcion_larga:
+            return f"{self.nombre_corto} {self.descripcion_larga}"
+        return self.nombre_corto or self.descripcion_larga
 
     def a_dict(self) -> dict:
         return {
             "numero": self.numero,
             "codigo": self.codigo,
-            "descripcion": self.descripcion,
+            "nombre_corto": self.nombre_corto,
+            "descripcion_larga": self.descripcion_larga,
             "cantidad": str(self.cantidad),
             "precio": str(self.precio),
             "monto": str(self.monto),
@@ -74,28 +83,20 @@ def _primero(nodo: ET.Element | None, *rutas: str, defecto: str = "") -> str:
     return defecto
 
 
-def _glosa_completa(detalle: ET.Element) -> str:
-    """Junta ``NmbItem`` (nombre corto) y ``DscItem`` (descripción larga).
-
-    El facturador gratuito del SII limita ``NmbItem`` a un cuadro chico y
-    guarda el texto adicional del cuadro largo en ``DscItem``, aparte. Unidos
-    con un espacio reproducen exactamente el texto que se ve en el PDF.
-    """
-    nombre = _texto(detalle, "NmbItem")
-    descripcion = _texto(detalle, "DscItem")
-    if nombre and descripcion:
-        return f"{nombre} {descripcion}".replace("\n", " ").strip()
-    return (nombre or descripcion).replace("\n", " ").strip()
-
-
 def _lineas(documento: ET.Element) -> list[LineaDetalle]:
+    """Extrae cada línea de detalle, con ``NmbItem`` (nombre corto, hasta 80
+    caracteres) y ``DscItem`` (el cuadro de texto largo, si el emisor lo usó)
+    como columnas separadas — el Excel/CSV del propio facturador descarta
+    ``DscItem`` al exportar, así que sólo el XML trae ambas.
+    """
     lineas = []
     for detalle in documento.findall("Detalle"):
         lineas.append(
             LineaDetalle(
                 numero=int(_texto(detalle, "NroLinDet", "0") or 0),
                 codigo=_texto(detalle, "CdgItem/VlrCodigo"),
-                descripcion=_glosa_completa(detalle),
+                nombre_corto=_texto(detalle, "NmbItem").replace("\n", " ").strip(),
+                descripcion_larga=_texto(detalle, "DscItem").replace("\n", " ").strip(),
                 cantidad=a_decimal(_texto(detalle, "QtyItem", "0")),
                 precio=a_decimal(_texto(detalle, "PrcItem", "0")),
                 monto=a_decimal(_texto(detalle, "MontoItem", "0")),

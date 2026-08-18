@@ -149,7 +149,15 @@ def test_guardar_detalle_ventas_actualiza_documento_existente(db):
         monto_iva=Decimal("190000"),
         monto_total=Decimal("1190000"),
         lineas=[
-            LineaDetalle(1, "", "Servicio de prueba", Decimal("1.00"), Decimal("1000000"), Decimal("1000000"))
+            LineaDetalle(
+                numero=1,
+                codigo="",
+                nombre_corto="Servicio de prueba",
+                descripcion_larga="con detalle extendido",
+                cantidad=Decimal("1.00"),
+                precio=Decimal("1000000"),
+                monto=Decimal("1000000"),
+            )
         ],
     )
     actualizados = guardar_detalle_ventas(db, TITULAR, [detalle])
@@ -158,7 +166,9 @@ def test_guardar_detalle_ventas_actualiza_documento_existente(db):
     assert actualizados == 1
     fila = reports.listar_documentos(db, reports.Filtro(TITULAR))[0][0]
     assert fila.tiene_detalle
-    assert fila.detalle[0]["descripcion"] == "Servicio de prueba"
+    assert fila.detalle[0]["nombre_corto"] == "Servicio de prueba"
+    assert fila.glosa_resumida == "Servicio de prueba"
+    assert fila.glosa_extendida == "con detalle extendido"
 
 
 def test_guardar_detalle_ventas_ignora_documento_sin_coincidencia(db):

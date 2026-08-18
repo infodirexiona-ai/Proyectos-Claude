@@ -28,9 +28,11 @@ Consecuencias prácticas:
 
 - **Puede romperse cuando el SII cambie su portal.** Todo lo específico del SII está aislado en
   `app/sii/endpoints.py` y `app/sii/rcv.py`, para que la reparación sea acotada.
-- **El flujo real no está verificado contra el SII.** El código está cubierto por tests con
-  respuestas de ejemplo (JSON y CSV), pero la conexión al portal de producción sólo se puede
-  comprobar con credenciales reales; hazlo primero con un periodo corto.
+- **El flujo real no está verificado contra el SII.** Se desarrolló en un entorno sin salida a
+  `*.sii.cl` (política de red del sandbox), así que el login y las llamadas al RCV están cubiertos
+  por tests con respuestas de ejemplo (JSON y CSV), pero nunca se ejecutaron contra el portal de
+  verdad. Antes de confiar en ella, corre `python -m app.cli doctor` (o la pestaña
+  **Diagnóstico**) y descarga primero un solo periodo.
 - **El SII limita las sesiones concurrentes por RUT.** La app cierra la sesión al terminar cada
   descarga; evita lanzar varias en paralelo para el mismo RUT.
 - **Sé prudente con la frecuencia.** Hay una pausa configurable entre llamadas
@@ -66,9 +68,17 @@ make demo    # http://localhost:8000
 
 1. Pon `SII_MODO=real` en el `.env`.
 2. Levanta la app: `make servir`.
-3. En **Credenciales**, guarda tu RUT y clave tributaria (queda cifrada con Fernet).
-4. En el **Panel**, elige el rango de periodos y pulsa *Descargar*.
-5. Sigue el avance en **Descargas**; al terminar, revisa **Documentos** y **Reportes**.
+3. Abre **Diagnóstico** y confirma que todo esté en verde (clave de cifrado, navegador,
+   conexión al SII). Si algo falla, ahí mismo dice cómo resolverlo.
+4. En **Credenciales**, guarda tu RUT y clave tributaria (queda cifrada con Fernet).
+5. En el **Panel**, elige el rango de periodos y pulsa *Descargar* — empieza con uno solo.
+6. Sigue el avance en **Descargas**; al terminar, revisa **Documentos** y **Reportes**.
+
+Lo mismo por línea de comandos, antes de automatizar nada:
+
+```bash
+python -m app.cli doctor
+```
 
 ![Documentos](docs/capturas/documentos.png)
 

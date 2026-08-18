@@ -19,6 +19,7 @@ from sqlalchemy import select
 from .config import get_settings
 from .crypto import descifrar, generar_clave
 from .db import SessionLocal, crear_esquema
+from .diagnostico import ejecutar_diagnostico
 from .models import Credencial
 from .rut import parse_rut
 from .services import export, reports
@@ -97,6 +98,17 @@ def _cmd_resumen(args) -> int:
     return 0
 
 
+def _cmd_doctor(args) -> int:
+    chequeos = ejecutar_diagnostico(revisar_red=not args.sin_red)
+    for chequeo in chequeos:
+        print(chequeo)
+    if all(c.ok for c in chequeos):
+        print("\nTodo listo.")
+        return 0
+    print("\nHay puntos pendientes arriba (✗). Resuélvelos antes de sincronizar de verdad.")
+    return 1
+
+
 def construir_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="app.cli", description=__doc__.splitlines()[0])
     parser.add_argument("-v", "--verbose", action="store_true", help="Muestra el detalle de las llamadas")
@@ -124,6 +136,10 @@ def construir_parser() -> argparse.ArgumentParser:
 
     clave = sub.add_parser("generar-clave", help="Genera una SII_CLAVE_CIFRADO")
     clave.set_defaults(func=lambda _args: (print(generar_clave()), 0)[1])
+
+    doctor = sub.add_parser("doctor", help="Revisa que la configuración, el navegador y la red estén listos")
+    doctor.add_argument("--sin-red", action="store_true", help="Omite las pruebas de conexión al SII")
+    doctor.set_defaults(func=_cmd_doctor)
 
     return parser
 

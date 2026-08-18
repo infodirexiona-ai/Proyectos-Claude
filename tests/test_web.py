@@ -138,3 +138,18 @@ def test_formato_clp_pone_el_signo_antes_del_simbolo():
     assert clp(-958360) == "-$958.360"
     assert clp(0) == "$0"
     assert clp(None) == "—"
+
+
+def test_diagnostico_pagina(cliente):
+    respuesta = cliente.get("/diagnostico?red=false")
+    assert respuesta.status_code == 200
+    assert "Diagnóstico" in respuesta.text
+    assert "Todo listo" in respuesta.text  # modo demo: no exige navegador ni red
+
+
+def test_diagnostico_api(cliente):
+    datos = cliente.get("/api/diagnostico?red=false").json()
+    assert datos["listo"] is True
+    nombres = {c["nombre"] for c in datos["chequeos"]}
+    assert "Modo de operación" in nombres
+    assert "Base de datos" in nombres

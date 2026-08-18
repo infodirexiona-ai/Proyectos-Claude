@@ -17,6 +17,7 @@ from .. import __version__
 from ..config import get_settings
 from ..crypto import ClaveCifradoAusente, cifrar, descifrar
 from ..db import crear_esquema, get_db
+from ..diagnostico import ejecutar_diagnostico
 from ..models import Credencial, Sincronizacion
 from ..rut import RutInvalido, parse_rut
 from ..services import export, reports
@@ -404,10 +405,34 @@ def eliminar_credencial(credencial_id: int, db: Session = Depends(get_db)):
     return RedirectResponse(url="/credenciales", status_code=303)
 
 
+# --- Diagnóstico -------------------------------------------------------------
+@app.get("/diagnostico", response_class=HTMLResponse)
+def vista_diagnostico(request: Request, db: Session = Depends(get_db), red: bool = Query(True)):
+    chequeos = ejecutar_diagnostico(revisar_red=red)
+    return _render(
+        request,
+        db,
+        "diagnostico.html",
+        titular=None,
+        chequeos=chequeos,
+        todo_listo=all(c.ok for c in chequeos),
+        reviso_red=red,
+    )
+
+
 # --- API JSON ---------------------------------------------------------------
 @app.get("/api/salud")
 def salud():
     return {"estado": "ok", "version": __version__, "modo": get_settings().modo}
+
+
+@app.get("/api/diagnostico")
+def api_diagnostico(red: bool = Query(True)):
+    chequeos = ejecutar_diagnostico(revisar_red=red)
+    return {
+        "listo": all(c.ok for c in chequeos),
+        "chequeos": [{"nombre": c.nombre, "ok": c.ok, "detalle": c.detalle} for c in chequeos],
+    }
 
 
 @app.get("/api/documentos")

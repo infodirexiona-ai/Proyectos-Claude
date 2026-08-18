@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block titulo %}Diagnóstico · Facturas SII{% endblock %}
+{% block contenido %}
+<section class="tarjeta">
+  <h1>Diagnóstico</h1>
+  <p class="nota">
+    Revisa que la configuración, el navegador y la conexión al SII estén listos antes de
+    lanzar una descarga real. Los chequeos de red pueden tardar unos segundos.
+  </p>
+
+  {% if todo_listo %}
+  <p class="resumen-filtro" style="border-left:3px solid var(--ok)">✓ Todo listo para sincronizar.</p>
+  {% else %}
+  <p class="error">Hay puntos pendientes abajo. Resuélvelos antes de sincronizar de verdad.</p>
+  {% endif %}
+
+  <table class="tabla">
+    <thead><tr><th>Chequeo</th><th>Estado</th><th>Detalle</th></tr></thead>
+    <tbody>
+      {% for c in chequeos %}
+      <tr>
+        <td>{{ c.nombre }}</td>
+        <td><span class="estado {{ 'estado-ok' if c.ok else 'estado-error' }}">{{ '✓ ok' if c.ok else '✗ falta' }}</span></td>
+        <td class="mensaje">{{ c.detalle }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p class="nota">
+    {% if reviso_red %}
+    <a href="/diagnostico?red=false">Repetir sin probar la red</a>
+    {% else %}
+    <a href="/diagnostico">Repetir incluyendo la conexión al SII</a>
+    {% endif %}
+  </p>
+</section>
+{% endblock %}

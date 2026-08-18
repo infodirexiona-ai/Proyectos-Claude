@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Facturas SII{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14'>🧾</text></svg>">
+  {% block cabeza %}{% endblock %}
+</head>
+<body>
+<header class="barra">
+  <a class="marca" href="/">🧾 Facturas SII</a>
+  <nav>
+    <a href="/" class="{{ 'activo' if request.url.path == '/' }}">Panel</a>
+    <a href="/documentos" class="{{ 'activo' if request.url.path == '/documentos' }}">Documentos</a>
+    <a href="/reportes" class="{{ 'activo' if request.url.path == '/reportes' }}">Reportes</a>
+    <a href="/sincronizaciones" class="{{ 'activo' if request.url.path == '/sincronizaciones' }}">Descargas</a>
+    <a href="/credenciales" class="{{ 'activo' if request.url.path == '/credenciales' }}">Credenciales</a>
+  </nav>
+  <span class="modo modo-{{ modo }}" title="Modo de operación">{{ modo }}</span>
+</header>
+
+{% if modo == 'demo' %}
+<p class="aviso">Modo <strong>demo</strong>: los datos son de ejemplo y no provienen del SII. Cambia <code>SII_MODO=real</code> para conectarte de verdad.</p>
+{% endif %}
+
+<main>
+  {% block contenido %}{% endblock %}
+</main>
+
+<footer>
+  <span>v{{ version }}</span>
+  <span>Datos obtenidos del Registro de Compras y Ventas del SII</span>
+</footer>
+</body>
+</html>

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block titulo %}Panel · Facturas SII{% endblock %}
+{% block contenido %}
+
+<section class="tarjeta">
+  <h1>Descargar del SII</h1>
+  <form method="post" action="/sincronizar" class="formulario-linea">
+    <label>RUT
+      <input type="text" name="rut" required placeholder="76.123.456-7"
+             value="{{ titular or (credenciales[0].rut if credenciales else '') }}">
+    </label>
+    <label>Desde <input type="text" name="desde" required placeholder="AAAAMM" value="{{ periodo_actual }}"></label>
+    <label>Hasta <input type="text" name="hasta" required placeholder="AAAAMM" value="{{ periodo_actual }}"></label>
+    <label class="casilla"><input type="checkbox" name="compras" checked> Compras</label>
+    <label class="casilla"><input type="checkbox" name="ventas" checked> Ventas</label>
+    {% if modo != 'demo' %}
+    <label>Clave tributaria <input type="password" name="clave" placeholder="(usa la guardada)"></label>
+    {% endif %}
+    <button type="submit">Descargar</button>
+  </form>
+  <p class="nota">Cada periodo son varias llamadas al SII; el trabajo corre en segundo plano y lo sigues en <a href="/sincronizaciones">Descargas</a>.</p>
+</section>
+
+{% if titular %}
+<section class="rejilla-kpi">
+  <div class="kpi kpi-compra">
+    <h3>Compras</h3>
+    <p class="cifra">{{ totales_compra.total | clp }}</p>
+    <p class="detalle">{{ totales_compra.documentos | numero }} documentos · IVA {{ totales_compra.iva | clp }}</p>
+  </div>
+  <div class="kpi kpi-venta">
+    <h3>Ventas</h3>
+    <p class="cifra">{{ totales_venta.total | clp }}</p>
+    <p class="detalle">{{ totales_venta.documentos | numero }} documentos · IVA {{ totales_venta.iva | clp }}</p>
+  </div>
+  <div class="kpi">
+    <h3>IVA del último periodo</h3>
+    {% if iva %}
+    <p class="cifra {{ 'negativo' if iva[0].saldo < 0 }}">{{ iva[0].saldo | clp }}</p>
+    <p class="detalle">{{ iva[0].periodo_legible }} · débito {{ iva[0].iva_debito | clp }} − crédito {{ iva[0].iva_credito | clp }}</p>
+    {% else %}
+    <p class="cifra">—</p><p class="detalle">Sin datos todavía</p>
+    {% endif %}
+  </div>
+  <div class="kpi">
+    <h3>Contribuyente</h3>
+    <p class="cifra pequena">{{ titular }}</p>
+    <p class="detalle">
+      <a href="/documentos?titular={{ titular }}">Ver documentos</a> ·
+      <a href="/exportar.xlsx?titular={{ titular }}">Excel</a>
+    </p>
+  </div>
+</section>
+
+{% if por_periodo %}
+<section class="tarjeta">
+  <h2>Movimiento por periodo</h2>
+  {% set maximo = por_periodo | map(attribute='total') | max %}
+  <table class="tabla">
+    <thead><tr><th>Periodo</th><th>Operación</th><th class="num">Docs.</th><th class="num">Neto</th><th class="num">IVA</th><th class="num">Total</th><th class="ancho">Peso</th></tr></thead>
+    <tbody>
+    {% for fila in por_periodo %}
+      <tr>
+        <td>{{ fila.periodo_legible }}</td>
+        <td><span class="etiqueta etiqueta-{{ fila.operacion | lower }}">{{ fila.operacion | capitalize }}</span></td>
+        <td class="num">{{ fila.documentos | numero }}</td>
+        <td class="num">{{ fila.neto | clp }}</td>
+        <td class="num">{{ fila.iva | clp }}</td>
+        <td class="num fuerte">{{ fila.total | clp }}</td>
+        <td><span class="barra-dato barra-{{ fila.operacion | lower }}"
+                  style="width: {{ (100 * (fila.total / maximo)) | round(1) if maximo else 0 }}%"></span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% else %}
+<section class="tarjeta vacio">
+  <p>Todavía no hay documentos guardados para {{ titular }}. Lanza una descarga arriba.</p>
+</section>
+{% endif %}
+{% endif %}
+
+{% if trabajos %}
+<section class="tarjeta">
+  <h2>Últimas descargas</h2>
+  <table class="tabla">
+    <thead><tr><th>#</th><th>RUT</th><th>Periodos</th><th>Estado</th><th class="num">Nuevos</th><th class="num">Actualizados</th></tr></thead>
+    <tbody>
+    {% for t in trabajos %}
+      <tr>
+        <td>{{ t.id }}</td><td>{{ t.rut_titular }}</td>
+        <td>{{ t.periodo_desde }} → {{ t.periodo_hasta }}</td>
+        <td><span class="estado estado-{{ t.estado }}">{{ t.estado }}</span></td>
+        <td class="num">{{ t.nuevos | numero }}</td><td class="num">{{ t.actualizados | numero }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

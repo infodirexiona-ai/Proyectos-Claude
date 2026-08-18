@@ -1,0 +1,24 @@
+{% macro selector_titular(titulares, titular) %}
+  <label>Contribuyente
+    <select name="titular">
+      {% for t in titulares %}
+      <option value="{{ t }}" {{ 'selected' if t == titular }}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </label>
+{% endmacro %}
+
+{% macro selector_operacion(valor) %}
+  <label>Operación
+    <select name="operacion">
+      <option value="">Todas</option>
+      <option value="COMPRA" {{ 'selected' if valor == 'COMPRA' }}>Compras</option>
+      <option value="VENTA" {{ 'selected' if valor == 'VENTA' }}>Ventas</option>
+    </select>
+  </label>
+{% endmacro %}
+
+{% macro periodos(desde, hasta) %}
+  <label>Desde <input type="text" name="desde" value="{{ desde }}" placeholder="AAAAMM" pattern="\d{4}(-)?\d{2}"></label>
+  <label>Hasta <input type="text" name="hasta" value="{{ hasta }}" placeholder="AAAAMM" pattern="\d{4}(-)?\d{2}"></label>
+{% endmacro %}

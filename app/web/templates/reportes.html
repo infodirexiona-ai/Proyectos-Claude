@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "_filtros.html" import selector_titular, selector_operacion, periodos %}
+{% block titulo %}Reportes · Facturas SII{% endblock %}
+{% block contenido %}
+
+<section class="tarjeta">
+  <h1>Reportes</h1>
+  {% if not titular %}
+    <p class="vacio">No hay datos cargados todavía.</p>
+  {% else %}
+  <form method="get" action="/reportes" class="formulario-linea">
+    {{ selector_titular(titulares, titular) }}
+    {{ periodos(filtros.desde, filtros.hasta) }}
+    {{ selector_operacion(filtros.operacion) }}
+    <button type="submit">Aplicar</button>
+    <a class="boton-secundario" href="/exportar.xlsx?titular={{ titular }}&desde={{ filtros.desde }}&hasta={{ filtros.hasta }}&operacion={{ filtros.operacion }}">Descargar Excel</a>
+  </form>
+  <p class="resumen-filtro">
+    <strong>{{ totales.documentos | numero }}</strong> documentos ·
+    neto <strong>{{ totales.neto | clp }}</strong> ·
+    IVA <strong>{{ totales.iva | clp }}</strong> ·
+    total <strong>{{ totales.total | clp }}</strong>
+  </p>
+  {% endif %}
+</section>
+
+{% if titular %}
+<section class="tarjeta">
+  <h2>IVA por periodo</h2>
+  <p class="nota">Apoyo para preparar el F29. No reemplaza la propuesta oficial del SII: no incluye retenciones, impuestos específicos ni remanentes de crédito.</p>
+  <table class="tabla">
+    <thead><tr><th>Periodo</th><th class="num">Ventas netas</th><th class="num">Compras netas</th><th class="num">IVA débito</th><th class="num">IVA crédito</th><th class="num">Saldo</th></tr></thead>
+    <tbody>
+      {% for f in iva %}
+      <tr>
+        <td>{{ f.periodo_legible }}</td>
+        <td class="num">{{ f.ventas_netas | clp }}</td>
+        <td class="num">{{ f.compras_netas | clp }}</td>
+        <td class="num">{{ f.iva_debito | clp }}</td>
+        <td class="num">{{ f.iva_credito | clp }}</td>
+        <td class="num fuerte {{ 'negativo' if f.saldo < 0 }}">{{ f.saldo | clp }}</td>
+      </tr>
+      {% else %}<tr><td colspan="6" class="vacio">Sin datos.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="tarjeta">
+  <h2>Por tipo de documento</h2>
+  <table class="tabla">
+    <thead><tr><th>Código</th><th>Documento</th><th>Operación</th><th class="num">Docs.</th><th class="num">Neto</th><th class="num">IVA</th><th class="num">Total</th></tr></thead>
+    <tbody>
+      {% for f in por_tipo %}
+      <tr>
+        <td>{{ f.tipo_doc }}</td><td>{{ f.tipo_doc_nombre }}</td>
+        <td><span class="etiqueta etiqueta-{{ f.operacion | lower }}">{{ f.operacion | capitalize }}</span></td>
+        <td class="num">{{ f.documentos | numero }}</td>
+        <td class="num">{{ f.neto | clp }}</td><td class="num">{{ f.iva | clp }}</td>
+        <td class="num fuerte">{{ f.total | clp }}</td>
+      </tr>
+      {% else %}<tr><td colspan="7" class="vacio">Sin datos.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="tarjeta">
+  <h2>Principales contrapartes</h2>
+  <table class="tabla">
+    <thead><tr><th>RUT</th><th>Razón social</th><th>Operación</th><th class="num">Docs.</th><th class="num">Neto</th><th class="num">IVA</th><th class="num">Total</th></tr></thead>
+    <tbody>
+      {% for f in por_contraparte %}
+      <tr>
+        <td><a href="/documentos?titular={{ titular }}&contraparte={{ f.rut }}">{{ f.rut }}</a></td>
+        <td>{{ f.razon_social }}</td>
+        <td><span class="etiqueta etiqueta-{{ f.operacion | lower }}">{{ f.operacion | capitalize }}</span></td>
+        <td class="num">{{ f.documentos | numero }}</td>
+        <td class="num">{{ f.neto | clp }}</td><td class="num">{{ f.iva | clp }}</td>
+        <td class="num fuerte">{{ f.total | clp }}</td>
+      </tr>
+      {% else %}<tr><td colspan="7" class="vacio">Sin datos.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

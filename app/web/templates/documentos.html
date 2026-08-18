@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "_filtros.html" import selector_titular, selector_operacion, periodos %}
+{% block titulo %}Documentos · Facturas SII{% endblock %}
+{% block contenido %}
+
+<section class="tarjeta">
+  <h1>Documentos</h1>
+  {% if not titular %}
+    <p class="vacio">No hay datos cargados. Lanza una descarga desde el <a href="/">panel</a>.</p>
+  {% else %}
+  <form method="get" action="/documentos" class="formulario-linea">
+    {{ selector_titular(titulares, titular) }}
+    {{ periodos(filtros.desde, filtros.hasta) }}
+    {{ selector_operacion(filtros.operacion) }}
+    <label>Tipo
+      <select name="tipo_doc">
+        <option value="">Todos</option>
+        {% for codigo, nombre in tipos_dte.items() %}
+        <option value="{{ codigo }}" {{ 'selected' if filtros.tipo_doc|string == codigo|string }}>{{ codigo }} · {{ nombre }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Buscar <input type="search" name="q" value="{{ filtros.q }}" placeholder="razón social, RUT o folio"></label>
+    <button type="submit">Filtrar</button>
+    <a class="boton-secundario" href="/documentos?titular={{ titular }}">Limpiar</a>
+  </form>
+
+  <div class="resumen-filtro">
+    <strong>{{ total | numero }}</strong> documentos ·
+    neto <strong>{{ resumen.neto | clp }}</strong> ·
+    IVA <strong>{{ resumen.iva | clp }}</strong> ·
+    total <strong>{{ resumen.total | clp }}</strong>
+    <span class="acciones">
+      <a class="boton-secundario" href="/exportar.xlsx?{{ request.url.query }}">Exportar Excel</a>
+      <a class="boton-secundario" href="/exportar.csv?{{ request.url.query }}">Exportar CSV</a>
+    </span>
+  </div>
+
+  <table class="tabla tabla-densa">
+    <thead>
+      <tr>
+        <th>Periodo</th><th>Op.</th><th>Tipo</th><th class="num">Folio</th>
+        <th>Contraparte</th><th>Emisión</th>
+        <th class="num">Exento</th><th class="num">Neto</th><th class="num">IVA</th><th class="num">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in documentos %}
+      <tr>
+        <td>{{ d.periodo_legible }}</td>
+        <td><span class="etiqueta etiqueta-{{ d.operacion | lower }}">{{ d.operacion[0] }}</span></td>
+        <td title="{{ d.tipo_doc_nombre }}">{{ d.tipo_doc }}</td>
+        <td class="num">{{ d.folio }}</td>
+        <td>
+          <a href="/documentos?titular={{ titular }}&contraparte={{ d.rut_contraparte }}">{{ d.razon_social or d.rut_contraparte }}</a>
+          <small>{{ d.rut_contraparte }}</small>
+        </td>
+        <td>{{ d.fecha_emision | fecha }}</td>
+        <td class="num">{{ d.monto_exento | clp }}</td>
+        <td class="num">{{ d.monto_neto | clp }}</td>
+        <td class="num">{{ d.monto_iva | clp }}</td>
+        <td class="num fuerte">{{ d.monto_total | clp }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10" class="vacio">Sin resultados para este filtro.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if paginas > 1 %}
+  <nav class="paginacion">
+    {% set base = request.url.remove_query_params('pagina') %}
+    {% if pagina > 1 %}<a href="{{ base.include_query_params(pagina=pagina-1) }}">← Anterior</a>{% endif %}
+    <span>Página {{ pagina }} de {{ paginas }}</span>
+    {% if pagina < paginas %}<a href="{{ base.include_query_params(pagina=pagina+1) }}">Siguiente →</a>{% endif %}
+  </nav>
+  {% endif %}
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titulo %}Credenciales · Facturas SII{% endblock %}
+{% block contenido %}
+<section class="tarjeta">
+  <h1>Credenciales</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  {% if not cifrado_configurado %}
+  <p class="error">Falta <code>SII_CLAVE_CIFRADO</code>. Genera una con <code>python -m app.crypto</code> y ponla en el <code>.env</code> antes de guardar claves.</p>
+  {% endif %}
+  <p class="nota">La clave tributaria se guarda cifrada (Fernet) con <code>SII_CLAVE_CIFRADO</code>. Nunca se muestra ni se escribe en los logs.</p>
+
+  <form method="post" action="/credenciales" class="formulario-linea">
+    <label>RUT <input type="text" name="rut" required placeholder="76.123.456-7"></label>
+    <label>Clave tributaria <input type="password" name="clave" required></label>
+    <label>Alias <input type="text" name="alias" placeholder="Mi empresa"></label>
+    <button type="submit">Guardar</button>
+  </form>
+
+  <table class="tabla">
+    <thead><tr><th>RUT</th><th>Alias</th><th>Actualizada</th><th></th></tr></thead>
+    <tbody>
+      {% for c in credenciales %}
+      <tr>
+        <td>{{ c.rut }}</td><td>{{ c.alias or '—' }}</td><td>{{ c.actualizado | fecha }}</td>
+        <td>
+          <form method="post" action="/credenciales/{{ c.id }}/eliminar" onsubmit="return confirm('¿Eliminar la credencial de {{ c.rut }}?')">
+            <button type="submit" class="boton-peligro">Eliminar</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="vacio">No hay credenciales guardadas.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

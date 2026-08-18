@@ -1,0 +1,20 @@
+[project]
+name = "facturas-sii"
+version = "0.1.0"
+description = "Descarga el Registro de Compras y Ventas del SII de Chile y genera reportes"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "C4"]
+ignore = ["B008"]  # Depends()/Query() en la firma es el idioma de FastAPI
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]  # conftest configura el entorno antes de importar la app
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error::DeprecationWarning"]

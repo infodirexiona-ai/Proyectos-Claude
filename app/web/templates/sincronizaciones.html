@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block titulo %}Descargas · Facturas SII{% endblock %}
+{% block cabeza %}<meta http-equiv="refresh" content="10">{% endblock %}
+{% block contenido %}
+<section class="tarjeta">
+  <h1>Descargas</h1>
+  <p class="nota">La página se refresca cada 10 segundos mientras haya trabajos en curso.</p>
+  <table class="tabla">
+    <thead>
+      <tr><th>#</th><th>RUT</th><th>Periodos</th><th>Operaciones</th><th>Estado</th>
+          <th class="num">Nuevos</th><th class="num">Actualizados</th><th>Archivos</th><th>Detalle</th></tr>
+    </thead>
+    <tbody>
+      {% for t in trabajos %}
+      <tr>
+        <td>{{ t.id }}</td>
+        <td>{{ t.rut_titular }}</td>
+        <td>{{ t.periodo_desde }} → {{ t.periodo_hasta }}</td>
+        <td>{{ t.operaciones }}</td>
+        <td><span class="estado estado-{{ t.estado }}">{{ t.estado }}</span></td>
+        <td class="num">{{ t.nuevos | numero }}</td>
+        <td class="num">{{ t.actualizados | numero }}</td>
+        <td>
+          {% for archivo in t.archivos or [] %}
+          <a href="/descargas/{{ archivo }}" class="chip">CSV</a>
+          {% else %}—{% endfor %}
+        </td>
+        <td class="mensaje">{{ t.mensaje or '' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9" class="vacio">Todavía no has lanzado ninguna descarga.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

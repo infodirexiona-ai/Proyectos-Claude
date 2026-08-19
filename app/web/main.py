@@ -223,9 +223,15 @@ def vista_documentos(
 
 
 @app.post("/documentos/eliminar-todo")
-def eliminar_documentos_titular(db: Session = Depends(get_db), titular: str = Form(...)):
-    """Borra todos los documentos guardados de un titular (no la credencial).
+def eliminar_documentos_titular(
+    db: Session = Depends(get_db),
+    titular: str = Form(...),
+    operacion: str = Form(""),
+    volver: str = Form("/documentos"),
+):
+    """Borra los documentos guardados de un titular (no la credencial).
 
+    ``operacion`` acota el borrado a compras o a ventas; vacío borra ambas.
     Pensado para limpiar datos de prueba o de un RUT equivocado. No toca el
     historial de Descargas ni la credencial guardada — esos se borran aparte.
     """
@@ -233,9 +239,13 @@ def eliminar_documentos_titular(db: Session = Depends(get_db), titular: str = Fo
         rut_titular = str(parse_rut(titular))
     except RutInvalido as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    db.execute(delete(Documento).where(Documento.rut_titular == rut_titular))
+    condiciones = [Documento.rut_titular == rut_titular]
+    if operacion in (ep.COMPRA, ep.VENTA):
+        condiciones.append(Documento.operacion == operacion)
+    db.execute(delete(Documento).where(*condiciones))
     db.commit()
-    return RedirectResponse(url="/documentos", status_code=303)
+    destino = volver if volver in ("/documentos", "/reportes") else "/documentos"
+    return RedirectResponse(url=f"{destino}?titular={rut_titular}", status_code=303)
 
 
 # --- Reportes ---------------------------------------------------------------

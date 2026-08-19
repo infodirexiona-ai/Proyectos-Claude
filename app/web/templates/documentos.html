@@ -68,10 +68,18 @@
       method="post"
       action="/documentos/eliminar-todo"
       class="formulario-linea"
-      onsubmit="return confirm('¿Eliminar TODOS los documentos de {{ titular }}? Esto no se puede deshacer.')"
+      onsubmit="return confirm('¿Eliminar ' + this.operacion.options[this.operacion.selectedIndex].text.toLowerCase() + ' de {{ titular }}? Esto no se puede deshacer.')"
     >
       <input type="hidden" name="titular" value="{{ titular }}">
-      <button type="submit" class="boton-peligro">Eliminar todos los documentos de {{ titular }}</button>
+      <input type="hidden" name="volver" value="/documentos">
+      <label>Qué eliminar
+        <select name="operacion">
+          <option value="">Todo (compras y ventas)</option>
+          <option value="COMPRA">Sólo compras</option>
+          <option value="VENTA">Sólo ventas</option>
+        </select>
+      </label>
+      <button type="submit" class="boton-peligro">Eliminar</button>
     </form>
   </details>
 

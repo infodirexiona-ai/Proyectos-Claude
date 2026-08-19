@@ -360,3 +360,32 @@ def test_elimina_todos_los_documentos_de_un_titular(cliente_con_datos):
         assert db.scalars(select(Documento).where(Documento.rut_titular == RUT)).all() == []
         # No toca el historial de descargas ni (por extensión) la credencial.
         assert db.scalars(select(Sincronizacion)).first() is not None
+
+
+def test_elimina_solo_las_compras_de_un_titular(cliente_con_datos):
+    from sqlalchemy import select
+
+    from app.db import SessionLocal
+    from app.models import Documento
+
+    respuesta = cliente_con_datos.post(
+        "/documentos/eliminar-todo",
+        data={"titular": RUT, "operacion": "COMPRA"},
+        follow_redirects=False,
+    )
+    assert respuesta.status_code == 303
+
+    with SessionLocal() as db:
+        restantes = db.scalars(select(Documento).where(Documento.rut_titular == RUT)).all()
+        assert restantes
+        assert all(d.operacion == "VENTA" for d in restantes)
+
+
+def test_eliminar_documentos_vuelve_a_reportes_si_se_pide(cliente_con_datos):
+    respuesta = cliente_con_datos.post(
+        "/documentos/eliminar-todo",
+        data={"titular": RUT, "volver": "/reportes"},
+        follow_redirects=False,
+    )
+    assert respuesta.status_code == 303
+    assert respuesta.headers["location"].startswith("/reportes")

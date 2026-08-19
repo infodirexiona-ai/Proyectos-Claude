@@ -21,6 +21,32 @@
     IVA <strong>{{ totales.iva | clp }}</strong> ·
     total <strong>{{ totales.total | clp }}</strong>
   </p>
+
+  <details class="tarjeta-detalle-ventas">
+    <summary>Eliminar documentos de este RUT (irreversible)</summary>
+    <p class="nota">
+      Borra documentos guardados de <strong>{{ titular }}</strong> — útil para limpiar datos de
+      prueba o de un RUT equivocado. No borra la credencial guardada ni el historial de
+      Descargas; eso se hace aparte, desde sus propias páginas.
+    </p>
+    <form
+      method="post"
+      action="/documentos/eliminar-todo"
+      class="formulario-linea"
+      onsubmit="return confirm('¿Eliminar ' + this.operacion.options[this.operacion.selectedIndex].text.toLowerCase() + ' de {{ titular }}? Esto no se puede deshacer.')"
+    >
+      <input type="hidden" name="titular" value="{{ titular }}">
+      <input type="hidden" name="volver" value="/reportes">
+      <label>Qué eliminar
+        <select name="operacion">
+          <option value="">Todo (compras y ventas)</option>
+          <option value="COMPRA">Sólo compras</option>
+          <option value="VENTA">Sólo ventas</option>
+        </select>
+      </label>
+      <button type="submit" class="boton-peligro">Eliminar</button>
+    </form>
+  </details>
   {% endif %}
 </section>
 

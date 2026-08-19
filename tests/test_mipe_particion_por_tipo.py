@@ -1,18 +1,16 @@
-"""Un tramo de fechas que se cae por timeout no debe tirar todo el trabajo.
+"""Un solo día con más de 20 documentos: partir por tipo de documento.
 
-Antes de este arreglo, si un tramo del rango pedido no respondía a tiempo
-(y el SII no llegó a mostrar el diálogo de "demasiados documentos"), la
-función lanzaba ``SiiError`` y esa excepción abortaba todo
-``descargar_detalle_ventas`` — perdiendo los documentos que ya se habían
-descargado de otros tramos, incluso los que vinieron de partir el rango por
-el límite de 20 documentos. Ahora ese tramo se registra como aviso y se
-salta, sin perder el resto.
+Partir el rango por fecha tiene un piso — un solo día —, así que si ese día
+por sí solo ya reúne más de 20 documentos (caso real: 22 facturas el
+31-05-2024), la bisección por fecha no puede ayudar más. Se prueba entonces
+por tipo de documento, la otra columna que acepta el mismo buscador del
+MIPYME.
 """
 
 from datetime import date
-from decimal import Decimal
 
 import app.sii.mipe as mipe
+from app.sii import endpoints as ep
 from app.sii.mipe_parser import DocumentoEmitido
 
 
@@ -54,10 +52,12 @@ def _importar_playwright_falso():
 
 
 def _documento(folio: int) -> DocumentoEmitido:
+    from decimal import Decimal
+
     return DocumentoEmitido(
         tipo_doc=33,
         folio=folio,
-        fecha_emision=date(2025, 1, 1),
+        fecha_emision=date(2024, 5, 31),
         rut_receptor="1-9",
         razon_social_receptor="Cliente",
         monto_neto=Decimal("1000"),
@@ -67,31 +67,29 @@ def _documento(folio: int) -> DocumentoEmitido:
     )
 
 
-def test_un_tramo_que_no_responde_no_pierde_los_documentos_de_los_demas(monkeypatch):
+def test_un_dia_con_mas_de_20_documentos_se_particiona_por_tipo(monkeypatch):
     monkeypatch.setattr(mipe, "_importar_playwright", _importar_playwright_falso)
     monkeypatch.setattr(mipe, "_login_en_pagina", lambda *_a, **_k: None)
     monkeypatch.setattr(mipe, "_seleccionar_empresa", lambda *_a, **_k: None)
 
-    def _intentar_descarga_falso(_pagina, desde, hasta, _timeout_ms, _tipo_doc=None):
-        if desde == date(2025, 1, 1) and hasta == date(2025, 1, 4):
+    dia = date(2024, 5, 31)
+    tipos_probados = []
+
+    def _intentar_descarga_falso(_pagina, desde, hasta, _timeout_ms, tipo_doc=None):
+        assert (desde, hasta) == (dia, dia)
+        if tipo_doc is None:
             return None, "el sistema retorna demasiados documentos electrónicos"
-        if desde == date(2025, 1, 1) and hasta == date(2025, 1, 2):
+        tipos_probados.append(tipo_doc)
+        if tipo_doc == 33:
             return b"<xml/>", None
-        if desde == date(2025, 1, 3) and hasta == date(2025, 1, 4):
-            return None, "no respondió a tiempo"
-        raise AssertionError(f"tramo inesperado: {desde}–{hasta}")
+        return None, "no hay documentos"
 
     monkeypatch.setattr(mipe, "_intentar_descarga", _intentar_descarga_falso)
-    monkeypatch.setattr(mipe, "parsear_respaldo_mipyme", lambda _contenido: [_documento(folio=1)])
+    monkeypatch.setattr(mipe, "parsear_respaldo_mipyme", lambda _contenido: [_documento(folio=7)])
 
-    resultado = mipe.descargar_detalle_ventas(
-        "76655600-0",
-        "76655600-0",
-        "clave",
-        date(2025, 1, 1),
-        date(2025, 1, 4),
-    )
+    resultado = mipe.descargar_detalle_ventas("76655600-0", "76655600-0", "clave", dia, dia)
 
-    assert [d.folio for d in resultado.documentos] == [1]
-    assert len(resultado.avisos) == 1
-    assert "no respondió a tiempo" in resultado.avisos[0]
+    assert [d.folio for d in resultado.documentos] == [7]
+    assert set(tipos_probados) == set(ep.MIPE_TIPOS_DOC_VENTA)
+    # Los tipos sin documentos ese día quedan como aviso, no como error fatal.
+    assert len(resultado.avisos) == len(ep.MIPE_TIPOS_DOC_VENTA) - 1

@@ -160,3 +160,11 @@ MIPE_BOTON_BUSCAR = "input[name='BTN_SUBMIT']"
 # de truncar el resultado. Hay que partir el rango de fechas y reintentar.
 MIPE_MAX_DOCUMENTOS_POR_DESCARGA = 20
 MIPE_TEXTO_DEMASIADOS_DOCUMENTOS = "demasiados documentos"
+
+# Partir por fecha tiene un piso: un solo día. Si ese día ya reúne más de
+# MIPE_MAX_DOCUMENTOS_POR_DESCARGA documentos, la única partición que le queda
+# a la búsqueda es por tipo de documento (campo TPO_DOC del mismo formulario).
+# Estos son los códigos nacionales de DTE que emite el facturador gratuito del
+# SII para ventas — no todo emisor usa los siete, pero probarlos todos cuando
+# se necesitan es inofensivo (una consulta vacía no cuesta nada distinto).
+MIPE_TIPOS_DOC_VENTA = (33, 34, 39, 41, 52, 56, 61)

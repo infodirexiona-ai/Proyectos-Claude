@@ -10,7 +10,11 @@ particularidades que obligan a manejarlas con un navegador real en vez de sólo
 2. El servidor rechaza de plano cualquier búsqueda que reúna más de
    ``MIPE_MAX_DOCUMENTOS_POR_DESCARGA`` documentos (lo avisa con un diálogo
    nativo del navegador, no con una respuesta HTTP de error), así que hay que
-   partir el rango de fechas pedido en trozos más chicos y reintentar.
+   partir el rango de fechas pedido en trozos más chicos y reintentar. Partir
+   por fecha tiene un piso — un solo día —, así que si ese día aun así reúne
+   más de ``MIPE_MAX_DOCUMENTOS_POR_DESCARGA`` documentos, se prueba además
+   por tipo de documento (``MIPE_TIPOS_DOC_VENTA``), la otra columna que
+   acepta el mismo buscador.
 3. Si el RUT autenticado representa a más de una empresa (el representante
    legal de varias sociedades, por ejemplo), el SII exige elegir con cuál
    operar antes de dejar ver cualquier documento — si no, cualquier URL del
@@ -53,16 +57,19 @@ class ResultadoDetalleVentas:
     avisos: list[str] = field(default_factory=list)
 
 
-def _url_busqueda(fecha_desde: date, fecha_hasta: date) -> str:
+def _url_busqueda(fecha_desde: date, fecha_hasta: date, tipo_doc: int | None = None) -> str:
     return (
         f"{ep.MIPE_ADMIN_DOCS}?RUT_RECP=&FOLIO=&RZN_SOC="
         f"&FEC_DESDE={fecha_desde.isoformat()}&FEC_HASTA={fecha_hasta.isoformat()}"
-        f"&TPO_DOC=&ESTADO=&ORDEN=&NUM_PAG=1"
+        f"&TPO_DOC={tipo_doc or ''}&ESTADO=&ORDEN=&NUM_PAG=1"
     )
 
 
-def _intentar_descarga(pagina, fecha_desde: date, fecha_hasta: date, timeout_ms: int):
-    """Busca el rango de fechas y descarga el XML de respaldo.
+def _intentar_descarga(
+    pagina, fecha_desde: date, fecha_hasta: date, timeout_ms: int, tipo_doc: int | None = None
+):
+    """Busca el rango de fechas (y, opcionalmente, el tipo de documento) y
+    descarga el XML de respaldo.
 
     Devuelve ``(contenido_xml, None)`` si hubo descarga, o
     ``(None, mensaje_de_error)`` si el SII mostró un diálogo en vez de bajar el
@@ -70,7 +77,7 @@ def _intentar_descarga(pagina, fecha_desde: date, fecha_hasta: date, timeout_ms:
     """
     _, PlaywrightTimeout, _ = _importar_playwright()
 
-    pagina.goto(_url_busqueda(fecha_desde, fecha_hasta), timeout=timeout_ms)
+    pagina.goto(_url_busqueda(fecha_desde, fecha_hasta, tipo_doc), timeout=timeout_ms)
 
     mensaje_dialogo: dict[str, str | None] = {"texto": None}
 
@@ -202,7 +209,7 @@ def descargar_detalle_ventas(
             _login_en_pagina(pagina, rut_obj, clave_tributaria, entorno, timeout_ms)
             _seleccionar_empresa(pagina, rut_titular_obj, timeout_ms)
 
-            pendientes: list[tuple[date, date]] = [(fecha_desde, fecha_hasta)]
+            pendientes: list[tuple[date, date, int | None]] = [(fecha_desde, fecha_hasta, None)]
             intentos = 0
             while pendientes:
                 intentos += 1
@@ -213,9 +220,9 @@ def descargar_detalle_ventas(
                     )
                     break
 
-                desde, hasta = pendientes.pop()
+                desde, hasta, tipo_doc = pendientes.pop()
                 try:
-                    contenido, error = _intentar_descarga(pagina, desde, hasta, timeout_ms)
+                    contenido, error = _intentar_descarga(pagina, desde, hasta, timeout_ms, tipo_doc)
                 except PlaywrightError as exc:
                     resultado.avisos.append(f"Error de navegador en {desde}–{hasta}: {exc}")
                     continue
@@ -225,16 +232,25 @@ def descargar_detalle_ventas(
                         documentos_por_clave[doc.clave] = doc
                     continue
 
-                if error and _es_error_demasiados_documentos(error) and desde < hasta:
-                    dias = (hasta - desde).days
-                    medio = desde + timedelta(days=dias // 2)
-                    pendientes.append((medio + timedelta(days=1), hasta))
-                    pendientes.append((desde, medio))
-                    continue
+                if error and _es_error_demasiados_documentos(error):
+                    if desde < hasta:
+                        dias = (hasta - desde).days
+                        medio = desde + timedelta(days=dias // 2)
+                        pendientes.append((medio + timedelta(days=1), hasta, tipo_doc))
+                        pendientes.append((desde, medio, tipo_doc))
+                        continue
+                    if tipo_doc is None:
+                        # Un solo día que aun así trae más de 20 documentos: partir
+                        # por fecha ya no da para más. Se prueba por tipo de
+                        # documento, que es la otra columna que acepta el buscador.
+                        pendientes.extend((desde, hasta, t) for t in ep.MIPE_TIPOS_DOC_VENTA)
+                        continue
 
+                etiqueta_tramo = "" if desde == hasta else f" al {hasta}"
+                etiqueta_tipo = f" (tipo {tipo_doc})" if tipo_doc else ""
                 resultado.avisos.append(
-                    f"No se pudo descargar el detalle de ventas del {desde}"
-                    f"{'' if desde == hasta else f' al {hasta}'}: {error or 'error desconocido'}"
+                    f"No se pudo descargar el detalle de ventas del {desde}{etiqueta_tramo}"
+                    f"{etiqueta_tipo}: {error or 'error desconocido'}"
                 )
         finally:
             _cerrar_sesion(pagina, timeout_ms)

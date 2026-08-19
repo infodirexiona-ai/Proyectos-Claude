@@ -164,6 +164,9 @@ button, .boton-secundario {
 .resumen-filtro { margin: 1rem 0; padding: 0.65rem 0.85rem; background: var(--fondo); border-radius: 6px; font-size: 0.88rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .resumen-filtro .acciones { margin-left: auto; display: flex; gap: 0.5rem; }
 
+td.acciones { display: flex; gap: 0.4rem; align-items: center; }
+td.acciones form { display: contents; }
+
 .nota { color: var(--suave); font-size: 0.82rem; margin: 0.6rem 0 0; }
 .vacio { color: var(--suave); text-align: center; padding: 1.25rem; }
 .error { color: var(--error); background: color-mix(in srgb, var(--error) 10%, transparent); padding: 0.6rem 0.85rem; border-radius: 6px; }

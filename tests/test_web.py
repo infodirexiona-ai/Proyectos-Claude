@@ -115,6 +115,35 @@ def test_credenciales_ciclo_completo(cliente):
         assert db.scalars(select(Credencial)).all() == []
 
 
+def test_reenviar_credencial_con_el_mismo_rut_actualiza_en_vez_de_duplicar(cliente):
+    """ "Editar" precarga el formulario con el mismo RUT; guardarlo de nuevo
+    debe reemplazar la clave, no crear una segunda credencial."""
+    from sqlalchemy import select
+
+    from app.db import SessionLocal
+    from app.models import Credencial
+
+    cliente.post("/credenciales", data={"rut": RUT, "clave": "clave-vieja-mal-escrita"})
+    cliente.post("/credenciales", data={"rut": RUT, "clave": "clave-correcta"})
+
+    with SessionLocal() as db:
+        credenciales = db.scalars(select(Credencial)).all()
+        assert len(credenciales) == 1
+
+        from app.config import get_settings
+        from app.crypto import descifrar
+
+        clave_guardada = descifrar(credenciales[0].clave_cifrada, get_settings().clave_cifrado)
+        assert clave_guardada == "clave-correcta"
+
+
+def test_boton_editar_trae_los_datos_de_la_fila(cliente):
+    cliente.post("/credenciales", data={"rut": RUT, "clave": "algo", "alias": "Mi empresa"})
+    pagina = cliente.get("/credenciales")
+    assert 'data-rut-titular="76192083-9"' in pagina.text
+    assert 'data-alias="Mi empresa"' in pagina.text
+
+
 def test_rut_invalido_rechazado(cliente):
     respuesta = cliente.post("/sincronizar", data={"rut": "12345678-9", "desde": "202403", "hasta": "202403"})
     assert respuesta.status_code == 400

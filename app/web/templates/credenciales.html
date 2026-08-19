@@ -9,11 +9,11 @@
   {% endif %}
   <p class="nota">La clave tributaria se guarda cifrada (Fernet) con <code>SII_CLAVE_CIFRADO</code>. Nunca se muestra ni se escribe en los logs.</p>
 
-  <form method="post" action="/credenciales" class="formulario-linea">
-    <label>RUT (titular) <input type="text" name="rut" required placeholder="76.123.456-7"></label>
-    <label>RUT de acceso <input type="text" name="rut_acceso" placeholder="(igual al titular si no aplica)"></label>
-    <label>Clave tributaria <input type="password" name="clave" required></label>
-    <label>Alias <input type="text" name="alias" placeholder="Mi empresa"></label>
+  <form method="post" action="/credenciales" class="formulario-linea" id="formulario-credencial">
+    <label>RUT (titular) <input type="text" name="rut" id="campo-rut" required placeholder="76.123.456-7"></label>
+    <label>RUT de acceso <input type="text" name="rut_acceso" id="campo-rut-acceso" placeholder="(igual al titular si no aplica)"></label>
+    <label>Clave tributaria <input type="password" name="clave" id="campo-clave" required></label>
+    <label>Alias <input type="text" name="alias" id="campo-alias" placeholder="Mi empresa"></label>
     <button type="submit">Guardar</button>
   </form>
   <p class="nota">
@@ -32,7 +32,14 @@
         <td>{{ c.rut if c.rut != c.rut_titular else '—' }}</td>
         <td>{{ c.alias or '—' }}</td>
         <td>{{ c.actualizado | fecha }}</td>
-        <td>
+        <td class="acciones">
+          <button
+            type="button"
+            class="boton-secundario boton-editar-credencial"
+            data-rut-titular="{{ c.rut_titular }}"
+            data-rut-acceso="{{ c.rut if c.rut != c.rut_titular else '' }}"
+            data-alias="{{ c.alias or '' }}"
+          >Editar</button>
           <form method="post" action="/credenciales/{{ c.id }}/eliminar" onsubmit="return confirm('¿Eliminar la credencial de {{ c.rut_titular }}?')">
             <button type="submit" class="boton-peligro">Eliminar</button>
           </form>
@@ -43,5 +50,22 @@
       {% endfor %}
     </tbody>
   </table>
+  <p class="nota">
+    "Editar" precarga el formulario de arriba con el RUT y el alias de esa fila; escribe la clave
+    correcta y pulsa Guardar para reemplazarla — no crea una credencial nueva.
+  </p>
 </section>
+<script>
+  document.querySelectorAll(".boton-editar-credencial").forEach((boton) => {
+    boton.addEventListener("click", () => {
+      document.getElementById("campo-rut").value = boton.dataset.rutTitular;
+      document.getElementById("campo-rut-acceso").value = boton.dataset.rutAcceso;
+      document.getElementById("campo-alias").value = boton.dataset.alias;
+      const campoClave = document.getElementById("campo-clave");
+      campoClave.value = "";
+      document.getElementById("formulario-credencial").scrollIntoView({ behavior: "smooth" });
+      campoClave.focus();
+    });
+  });
+</script>
 {% endblock %}

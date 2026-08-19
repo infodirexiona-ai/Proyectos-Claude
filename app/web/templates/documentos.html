@@ -111,7 +111,12 @@
   <nav class="paginacion">
     {% set base = request.url.remove_query_params('pagina') %}
     {% if pagina > 1 %}<a href="{{ base.include_query_params(pagina=pagina-1) }}">← Anterior</a>{% endif %}
-    <span>Página {{ pagina }} de {{ paginas }}</span>
+    {% for p in paginas_visibles %}
+      {% if p is none %}<span class="paginacion-relleno">…</span>
+      {% elif p == pagina %}<span class="paginacion-actual">{{ p }}</span>
+      {% else %}<a href="{{ base.include_query_params(pagina=p) }}">{{ p }}</a>
+      {% endif %}
+    {% endfor %}
     {% if pagina < paginas %}<a href="{{ base.include_query_params(pagina=pagina+1) }}">Siguiente →</a>{% endif %}
   </nav>
   {% endif %}

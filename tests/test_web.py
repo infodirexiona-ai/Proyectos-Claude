@@ -274,3 +274,48 @@ def test_elimina_un_registro_del_historial_de_descargas(cliente_con_datos):
 
     datos = cliente_con_datos.get("/api/documentos", params={"titular": RUT}).json()
     assert datos["total"] > 0
+
+
+def test_elimina_un_trabajo_atascado_en_corriendo(cliente_con_datos):
+    """Un trabajo que quedó en "corriendo" (p. ej. porque el servidor se cerró
+    a mitad de una descarga) también debe poder borrarse del historial."""
+    from sqlalchemy import select
+
+    from app.db import SessionLocal
+    from app.models import Sincronizacion
+
+    with SessionLocal() as db:
+        trabajo = db.scalars(select(Sincronizacion)).one()
+        trabajo.estado = "corriendo"
+        db.commit()
+        trabajo_id = trabajo.id
+
+    respuesta = cliente_con_datos.post(f"/sincronizaciones/{trabajo_id}/eliminar", follow_redirects=False)
+    assert respuesta.status_code == 303
+
+    with SessionLocal() as db:
+        assert db.scalars(select(Sincronizacion)).all() == []
+
+
+def test_paginas_visibles_lista_completa_cuando_son_pocas():
+    from app.web.main import _paginas_visibles
+
+    assert _paginas_visibles(1, 5) == [1, 2, 3, 4, 5]
+
+
+def test_paginas_visibles_usa_relleno_cuando_son_muchas():
+    from app.web.main import _paginas_visibles
+
+    assert _paginas_visibles(10, 20) == [1, None, 9, 10, 11, None, 20]
+
+
+def test_documentos_pagina_dos_es_navegable_por_numero(cliente_con_datos):
+    """Antes sólo había "Anterior"/"Siguiente"; ahora el número de página 2
+    también debe aparecer como un enlace navegable."""
+    cliente_con_datos.post(
+        "/sincronizar",
+        data={"rut": RUT, "desde": "202405", "hasta": "202412", "compras": "on", "ventas": "on"},
+    )
+    respuesta = cliente_con_datos.get("/documentos", params={"titular": RUT})
+    assert 'href="/documentos?' in respuesta.text
+    assert "pagina=2" in respuesta.text

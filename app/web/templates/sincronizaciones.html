@@ -27,7 +27,11 @@
         </td>
         <td class="mensaje">{{ t.mensaje or '' }}</td>
         <td>
-          {% if t.estado != 'corriendo' %}
+          {% if t.estado == 'corriendo' %}
+          <form method="post" action="/sincronizaciones/{{ t.id }}/eliminar" onsubmit="return confirm('Este trabajo sigue como \'Corriendo\' — normalmente es porque el servidor se cerró a mitad de la descarga y quedó colgado. ¿Eliminar igual el registro? No borra documentos ya descargados.')">
+            <button type="submit" class="boton-peligro">Eliminar</button>
+          </form>
+          {% else %}
           <form method="post" action="/sincronizaciones/{{ t.id }}/eliminar" onsubmit="return confirm('¿Eliminar este registro del historial? No borra documentos ya descargados.')">
             <button type="submit" class="boton-peligro">Eliminar</button>
           </form>

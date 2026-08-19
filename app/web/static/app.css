@@ -168,8 +168,11 @@ button, .boton-secundario {
 .vacio { color: var(--suave); text-align: center; padding: 1.25rem; }
 .error { color: var(--error); background: color-mix(in srgb, var(--error) 10%, transparent); padding: 0.6rem 0.85rem; border-radius: 6px; }
 
-.paginacion { display: flex; gap: 1rem; align-items: center; justify-content: center; margin-top: 1rem; font-size: 0.88rem; }
+.paginacion { display: flex; gap: 0.6rem; align-items: center; justify-content: center; margin-top: 1rem; font-size: 0.88rem; flex-wrap: wrap; }
 .paginacion a { color: var(--acento); text-decoration: none; }
+.paginacion a:hover { text-decoration: underline; }
+.paginacion-actual { font-weight: 600; }
+.paginacion-relleno { color: var(--suave); }
 
 footer { max-width: 1180px; margin: 2rem auto; padding: 0 1.25rem 2rem; display: flex; justify-content: space-between; color: var(--suave); font-size: 0.78rem; }
 

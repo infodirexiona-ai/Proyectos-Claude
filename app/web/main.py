@@ -103,6 +103,28 @@ def _entero_opcional(valor: str | None) -> int | None:
     return int(valor) if valor else None
 
 
+def _paginas_visibles(pagina: int, paginas: int) -> list[int | None]:
+    """Números de página a mostrar en el paginador, con ``None`` como "…".
+
+    Siempre muestra la primera, la última, y un par de páginas alrededor de
+    la actual — para no listar cientos de números cuando hay muchas páginas.
+    """
+    if paginas <= 7:
+        return list(range(1, paginas + 1))
+
+    visibles = {1, paginas, pagina - 1, pagina, pagina + 1}
+    visibles = sorted(p for p in visibles if 1 <= p <= paginas)
+
+    resultado: list[int | None] = []
+    anterior = None
+    for p in visibles:
+        if anterior is not None and p - anterior > 1:
+            resultado.append(None)
+        resultado.append(p)
+        anterior = p
+    return resultado
+
+
 def _filtro(
     titular: str,
     desde: str | None = None,
@@ -177,6 +199,7 @@ def vista_documentos(
     except PeriodoInvalido as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    paginas = max(1, -(-total // por_pagina))
     return _render(
         request,
         db,
@@ -186,7 +209,8 @@ def vista_documentos(
         total=total,
         resumen=resumen,
         pagina=pagina,
-        paginas=max(1, -(-total // por_pagina)),
+        paginas=paginas,
+        paginas_visibles=_paginas_visibles(pagina, paginas),
         orden=orden,
         filtros={
             "desde": desde or "",

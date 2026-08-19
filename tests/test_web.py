@@ -178,6 +178,25 @@ def test_detalle_ventas_rut_invalido(cliente):
     assert respuesta.status_code == 400
 
 
+def test_detalle_ventas_acepta_fecha_exacta_aaaammdd(cliente_con_datos):
+    """Antes sólo aceptaba AAAAMM; una fecha exacta como "20240301" tiraba un
+    400 porque se intentaba interpretar como periodo mensual."""
+    respuesta = cliente_con_datos.post(
+        "/sincronizar-detalle-ventas",
+        data={"rut": RUT, "desde": "20240301", "hasta": "20240315"},
+        follow_redirects=False,
+    )
+    assert respuesta.status_code == 303
+
+
+def test_detalle_ventas_fecha_inicial_posterior_a_la_final(cliente_con_datos):
+    respuesta = cliente_con_datos.post(
+        "/sincronizar-detalle-ventas",
+        data={"rut": RUT, "desde": "20240315", "hasta": "20240301"},
+    )
+    assert respuesta.status_code == 400
+
+
 def test_credencial_con_rut_de_acceso_distinto(cliente):
     """El representante legal (11433270-4) puede guardar la credencial de una
     empresa (76655600-0) que representa, con su propio RUT de acceso."""

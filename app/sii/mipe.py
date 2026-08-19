@@ -101,6 +101,24 @@ def _es_error_demasiados_documentos(mensaje: str) -> bool:
     return ep.MIPE_TEXTO_DEMASIADOS_DOCUMENTOS in mensaje.lower()
 
 
+def _cerrar_sesion(pagina, timeout_ms: int) -> None:
+    """Avisa al SII que cierre la sesión antes de cerrar el navegador.
+
+    El SII limita cuántas sesiones autenticadas puede tener abiertas un mismo
+    RUT a la vez ("Usted ha superado el máximo de sesiones autenticadas...").
+    Cerrar sólo el navegador no basta — la sesión sigue viva del lado del
+    servidor hasta que expira sola — así que hay que navegar a la URL de
+    logout explícitamente. Es un esfuerzo best-effort: si falla, no debe
+    tapar el resultado real de la descarga.
+    """
+    if pagina is None:
+        return
+    try:
+        pagina.goto(ep.URL_LOGOUT, timeout=timeout_ms)
+    except Exception:  # noqa: BLE001 - el logout es best-effort
+        log.warning("No se pudo cerrar la sesión del MIPYME en el SII.")
+
+
 def _seleccionar_empresa(pagina, rut_titular_obj, timeout_ms: int) -> None:
     """Elige con qué empresa operar en el MIPYME.
 
@@ -177,6 +195,7 @@ def descargar_detalle_ventas(
         if ruta_navegador:
             opciones["executable_path"] = ruta_navegador
         navegador = pw.chromium.launch(**opciones)
+        pagina = None
         try:
             contexto = navegador.new_context(user_agent=user_agent, accept_downloads=True)
             pagina = contexto.new_page()
@@ -218,6 +237,7 @@ def descargar_detalle_ventas(
                     f"{'' if desde == hasta else f' al {hasta}'}: {error or 'error desconocido'}"
                 )
         finally:
+            _cerrar_sesion(pagina, timeout_ms)
             navegador.close()
 
     resultado.documentos = sorted(documentos_por_clave.values(), key=lambda d: (d.tipo_doc, d.folio))

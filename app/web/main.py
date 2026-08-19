@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import calendar
 import logging
 from contextlib import asynccontextmanager
-from datetime import date
 from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Form, HTTPException, Query, Request
@@ -23,7 +21,7 @@ from ..diagnostico import ejecutar_diagnostico
 from ..models import Credencial, Sincronizacion
 from ..rut import RutInvalido, parse_rut
 from ..services import export, reports
-from ..services.periodos import PeriodoInvalido, normalizar_periodo, periodo_actual, rango_periodos
+from ..services.periodos import PeriodoInvalido, normalizar_fecha, periodo_actual, rango_periodos
 from ..services.sync import (
     ruta_descarga,
     sincronizar_detalle_ventas_en_segundo_plano,
@@ -413,18 +411,23 @@ def lanzar_sincronizacion_detalle_ventas(
     Sólo sirve para documentos que el propio contribuyente emitió con el
     facturador gratuito del SII, y sólo actualiza documentos que ya existan
     (hay que haber corrido una descarga normal para ese rango antes).
+
+    ``desde``/``hasta`` aceptan un periodo ``YYYYMM`` o, para acotar un tramo
+    puntual (por ejemplo, reintentar sólo los días que fallaron la vez
+    anterior), una fecha exacta ``YYYYMMDD``.
     """
     settings = get_settings()
     try:
         rut_titular = str(parse_rut(rut))
-        periodo_desde = normalizar_periodo(desde)
-        periodo_hasta = normalizar_periodo(hasta)
+        fecha_desde = normalizar_fecha(desde)
+        fecha_hasta = normalizar_fecha(hasta, fin=True)
     except (RutInvalido, PeriodoInvalido) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if fecha_desde > fecha_hasta:
+        raise HTTPException(status_code=400, detail="La fecha inicial es posterior a la final")
 
-    fecha_desde = date(int(periodo_desde[:4]), int(periodo_desde[4:]), 1)
-    ultimo_dia = calendar.monthrange(int(periodo_hasta[:4]), int(periodo_hasta[4:]))[1]
-    fecha_hasta = date(int(periodo_hasta[:4]), int(periodo_hasta[4:]), ultimo_dia)
+    periodo_desde = f"{fecha_desde:%Y%m}"
+    periodo_hasta = f"{fecha_hasta:%Y%m}"
 
     clave_final = (clave or "").strip()
     rut_login = (rut_acceso or "").strip() or None

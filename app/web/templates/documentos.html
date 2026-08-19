@@ -42,12 +42,14 @@
       Sólo funciona para facturas de <strong>venta</strong> que emitiste con el
       <strong>facturador gratuito del SII</strong> (no aplica a las que recibiste, ni a las
       emitidas con un facturador privado como Nubox o Bsale). Necesita que ya hayas descargado
-      el periodo con el RCV — esto sólo completa la glosa encima.
+      el periodo con el RCV — esto sólo completa la glosa encima. Acepta un periodo
+      (<code>AAAAMM</code>, ej. <code>202501</code>) o, para acotar un tramo puntual, una fecha
+      exacta (<code>AAAAMMDD</code>, ej. <code>20250118</code>).
     </p>
     <form method="post" action="/sincronizar-detalle-ventas" class="formulario-linea">
       <input type="hidden" name="rut" value="{{ titular }}">
-      <label>Desde <input type="text" name="desde" required placeholder="AAAAMM" value="{{ filtros.desde }}"></label>
-      <label>Hasta <input type="text" name="hasta" required placeholder="AAAAMM" value="{{ filtros.hasta }}"></label>
+      <label>Desde <input type="text" name="desde" required placeholder="AAAAMM o AAAAMMDD" value="{{ filtros.desde }}"></label>
+      <label>Hasta <input type="text" name="hasta" required placeholder="AAAAMM o AAAAMMDD" value="{{ filtros.hasta }}"></label>
       {% if modo != 'demo' %}
       <label>Clave tributaria <input type="password" name="clave" placeholder="(usa la guardada)"></label>
       {% endif %}

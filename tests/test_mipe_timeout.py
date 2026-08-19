@@ -17,7 +17,8 @@ from app.sii.mipe_parser import DocumentoEmitido
 
 
 class _PaginaFalsa:
-    pass
+    def goto(self, *_args, **_kwargs):
+        pass
 
 
 class _ContextoFalso:

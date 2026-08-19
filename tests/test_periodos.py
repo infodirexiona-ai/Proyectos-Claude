@@ -1,7 +1,10 @@
+from datetime import date
+
 import pytest
 
 from app.services.periodos import (
     PeriodoInvalido,
+    normalizar_fecha,
     normalizar_periodo,
     periodo_legible,
     rango_periodos,
@@ -33,3 +36,20 @@ def test_mes_invalido():
 
 def test_legible():
     assert periodo_legible("202403") == "Marzo 2024"
+
+
+def test_normaliza_fecha_exacta():
+    assert normalizar_fecha("20250118") == date(2025, 1, 18)
+
+
+def test_normaliza_fecha_exacta_invalida():
+    with pytest.raises(PeriodoInvalido):
+        normalizar_fecha("20250230")  # 30 de febrero no existe
+
+
+def test_normaliza_fecha_desde_periodo_usa_primer_dia():
+    assert normalizar_fecha("202502") == date(2025, 2, 1)
+
+
+def test_normaliza_fecha_desde_periodo_con_fin_usa_ultimo_dia():
+    assert normalizar_fecha("202502", fin=True) == date(2025, 2, 28)

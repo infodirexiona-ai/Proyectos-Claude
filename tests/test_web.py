@@ -252,3 +252,25 @@ def test_filtro_tipo_doc_vacio_no_revienta(cliente_con_datos):
 def test_filtro_tipo_doc_con_valor_sigue_funcionando(cliente_con_datos):
     respuesta = cliente_con_datos.get("/documentos", params={"titular": RUT, "tipo_doc": "33"})
     assert respuesta.status_code == 200
+
+
+def test_elimina_un_registro_del_historial_de_descargas(cliente_con_datos):
+    """Borrar del historial (p. ej. un intento fallido) no debe tocar los
+    documentos que ya se guardaron en otros trabajos."""
+    from sqlalchemy import select
+
+    from app.db import SessionLocal
+    from app.models import Sincronizacion
+
+    with SessionLocal() as db:
+        trabajo = db.scalars(select(Sincronizacion)).one()
+        trabajo_id = trabajo.id
+
+    respuesta = cliente_con_datos.post(f"/sincronizaciones/{trabajo_id}/eliminar", follow_redirects=False)
+    assert respuesta.status_code == 303
+
+    with SessionLocal() as db:
+        assert db.scalars(select(Sincronizacion)).all() == []
+
+    datos = cliente_con_datos.get("/api/documentos", params={"titular": RUT}).json()
+    assert datos["total"] > 0

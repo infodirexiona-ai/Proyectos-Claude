@@ -311,6 +311,16 @@ def vista_sincronizaciones(request: Request, db: Session = Depends(get_db)):
     return _render(request, db, "sincronizaciones.html", titular=None, trabajos=trabajos)
 
 
+@app.post("/sincronizaciones/{sync_id}/eliminar")
+def eliminar_sincronizacion(sync_id: int, db: Session = Depends(get_db)):
+    """Borra un registro del historial de descargas. No toca los documentos ya guardados."""
+    trabajo = db.get(Sincronizacion, sync_id)
+    if trabajo:
+        db.delete(trabajo)
+        db.commit()
+    return RedirectResponse(url="/sincronizaciones", status_code=303)
+
+
 @app.post("/sincronizar")
 def lanzar_sincronizacion(
     tareas: BackgroundTasks,

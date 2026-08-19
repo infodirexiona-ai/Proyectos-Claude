@@ -8,7 +8,7 @@
   <table class="tabla">
     <thead>
       <tr><th>#</th><th>RUT</th><th>Periodos</th><th>Operaciones</th><th>Estado</th>
-          <th class="num">Nuevos</th><th class="num">Actualizados</th><th>Archivos</th><th>Detalle</th></tr>
+          <th class="num">Nuevos</th><th class="num">Actualizados</th><th>Archivos</th><th>Detalle</th><th></th></tr>
     </thead>
     <tbody>
       {% for t in trabajos %}
@@ -26,9 +26,16 @@
           {% else %}—{% endfor %}
         </td>
         <td class="mensaje">{{ t.mensaje or '' }}</td>
+        <td>
+          {% if t.estado != 'corriendo' %}
+          <form method="post" action="/sincronizaciones/{{ t.id }}/eliminar" onsubmit="return confirm('¿Eliminar este registro del historial? No borra documentos ya descargados.')">
+            <button type="submit" class="boton-peligro">Eliminar</button>
+          </form>
+          {% endif %}
+        </td>
       </tr>
       {% else %}
-      <tr><td colspan="9" class="vacio">Todavía no has lanzado ninguna descarga.</td></tr>
+      <tr><td colspan="10" class="vacio">Todavía no has lanzado ninguna descarga.</td></tr>
       {% endfor %}
     </tbody>
   </table>

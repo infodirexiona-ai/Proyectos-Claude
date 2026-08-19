@@ -200,3 +200,61 @@ MIPE_TEXTO_DEMASIADOS_DOCUMENTOS = "demasiados documentos"
 # SII para ventas — no todo emisor usa los siete, pero probarlos todos cuando
 # se necesitan es inofensivo (una consulta vacía no cuesta nada distinto).
 MIPE_TIPOS_DOC_VENTA = (33, 34, 39, 41, 52, 56, 61)
+
+
+# --- Emisor de Boletas de Honorarios Electrónicas ----------------------------
+#
+# Portal distinto tanto del RCV como del MIPYME — páginas CGI clásicas en
+# ``loa.sii.cl/cgi_IMT/``. A diferencia de los otros dos, esto ES escritura:
+# emite un documento tributario real a nombre de otra persona, con efecto
+# legal. Reconstruido a partir de capturas de pantalla y "Ver código fuente"
+# del portal real (agosto 2026) — a diferencia del MIPYME, esto TODAVÍA no se
+# probó en vivo contra el SII. Antes de usarlo con datos reales, verificar
+# cada paso con cuidado.
+BOLETAS_BASE = "https://loa.sii.cl"
+
+# Paso 1: elegir quién retiene el Pago Provisional Mensual. La primera opción
+# ("el receptor retiene") viene marcada por defecto en el portal — el cliente
+# no necesita tocar los radios si eso es lo que quiere, sólo hacer clic en
+# "Continuar". El parámetro "dummy" es sólo un anti-caché (un timestamp); su
+# valor exacto no importa.
+BOLETAS_TIPO_RETENCION = f"{BOLETAS_BASE}/cgi_IMT/TMBECN_ValidaTimbrajeContrib.cgi"
+BOLETAS_TIPO_RETENCION_MODO_CONTRIBUYENTE = "1"
+
+# Paso 2: formulario en blanco (opción "Por contribuyente" del menú, sin
+# prellenar con destinatarios usados antes — es la que sirve para emitir a
+# varios RUT nuevos desde una planilla).
+BOLETAS_FORMULARIO = f"{BOLETAS_BASE}/cgi_IMT/TMBECN_PresentaDatosBoleta.cgi"
+BOLETAS_CAMPO_DIA = "select[name='cbo_dia_boleta']"
+BOLETAS_CAMPO_MES = "select[name='cbo_mes_boleta']"
+BOLETAS_CAMPO_ANIO = "select[name='cbo_anio_boleta']"
+BOLETAS_CAMPO_RUT_DESTINATARIO = "input[name='txt_rut_destinatario']"
+BOLETAS_CAMPO_DV_DESTINATARIO = "input[name='txt_dv_destinatario']"
+BOLETAS_CAMPO_NOMBRE_DESTINATARIO = "input[name='txt_nombres_destinatario']"
+BOLETAS_CAMPO_DOMICILIO_DESTINATARIO = "input[name='txt_domicilio_destinatario']"
+BOLETAS_CAMPO_REGION = "select[name='cod_region']"
+BOLETAS_CAMPO_COMUNA = "select[name='cbo_comuna']"
+BOLETAS_BOTON_MAS_PRESTACIONES = "input[value='Mas prestaciones...']"
+BOLETAS_BOTON_CONFIRMAR_EMISION = "input[name='cmdAceptar']"
+BOLETAS_MAX_PRESTACIONES = 10
+
+# Paso 3: borrador — "ESTE ES UN BORRADOR, NO TIENE NINGUNA VALIDEZ". El botón
+# real que emite el documento (efecto legal, ya no hay vuelta atrás salvo
+# anulación) es este.
+BOLETAS_BORRADOR = f"{BOLETAS_BASE}/cgi_IMT/TMBECN_ConfirmaTimbrajeContrib.cgi"
+BOLETAS_BOTON_EMITIR = "input[name='cmdconfirmar']"
+BOLETAS_TEXTO_BORRADOR = "este es un borrador"
+
+# --- Anulación de boletas (red de seguridad si algo se emitió mal) ----------
+BOLETAS_ANULAR_PASO1 = f"{BOLETAS_BASE}/cgi_IMT/TMBANU_PrevalidaAnulacion.cgi"
+BOLETAS_CAMPO_FOLIO_ANULAR = "input[name='Txt_BoletaAnular']"
+BOLETAS_CAMPO_CAUSA_ANULACION = "input[name='OptCausaAnulacion']"
+BOLETAS_BOTON_CONTINUAR_ANULACION = "input[name='cmdContinuar']"
+# Causas que el SII acepta para anular — deben coincidir ambas partes
+# (emisor y receptor) para que se haga efectiva.
+BOLETAS_CAUSA_NO_PAGO = "1"
+BOLETAS_CAUSA_NO_PRESTACION = "2"
+BOLETAS_CAUSA_ERROR_DIGITACION = "3"
+
+BOLETAS_ANULAR_PASO2 = f"{BOLETAS_BASE}/cgi_IMT/TMBANU_ConfirmarAnulacion.cgi"
+BOLETAS_BOTON_CONFIRMAR_ANULACION = "input[name='BtnConfirmar']"

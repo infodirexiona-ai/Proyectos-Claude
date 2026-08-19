@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block titulo %}Facturas SII{% endblock %}</title>
+  <title>{% block titulo %}EaSII{% endblock %}</title>
   <link rel="stylesheet" href="/static/app.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14'>🧾</text></svg>">
   {% block cabeza %}{% endblock %}
 </head>
 <body>
 <header class="barra">
-  <a class="marca" href="/">🧾 Facturas SII</a>
+  <a class="marca" href="/">🧾 EaSII</a>
   <nav>
     <a href="/" class="{{ 'activo' if request.url.path == '/' }}">Panel</a>
     <a href="/documentos" class="{{ 'activo' if request.url.path == '/documentos' }}">Documentos</a>
@@ -19,7 +19,6 @@
     <a href="/credenciales" class="{{ 'activo' if request.url.path == '/credenciales' }}">Credenciales</a>
     <a href="/diagnostico" class="{{ 'activo' if request.url.path == '/diagnostico' }}">Diagnóstico</a>
   </nav>
-  <span class="modo modo-{{ modo }}" title="Modo de operación">{{ modo }}</span>
 </header>
 
 {% if modo == 'demo' %}

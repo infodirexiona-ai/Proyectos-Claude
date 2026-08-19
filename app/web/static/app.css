@@ -56,9 +56,6 @@ body {
 .barra nav a:hover { color: var(--texto); }
 .barra nav a.activo { color: var(--acento); border-bottom: 2px solid var(--acento); font-weight: 600; }
 
-.modo { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0.2rem 0.55rem; border-radius: 999px; border: 1px solid var(--borde); color: var(--suave); }
-.modo-demo { color: var(--compra); border-color: var(--compra); }
-
 main { max-width: 1180px; margin: 1.5rem auto; padding: 0 1.25rem; }
 
 .aviso {

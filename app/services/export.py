@@ -111,11 +111,12 @@ def excel_documentos(db: Session, filtro: reports.Filtro, *, limite: int = 50_00
     _escribir_hoja(
         libro,
         "Por tipo de documento",
-        ["Código", "Documento", "Operación", "Documentos", "Neto", "IVA", "Total"],
+        ["Código", "Documento", "Descripción", "Operación", "Documentos", "Neto", "IVA", "Total"],
         [
             [
                 f["tipo_doc"],
                 f["tipo_doc_nombre"],
+                ep.descripcion_tipo_dte(f["tipo_doc"]),
                 f["operacion"],
                 f["documentos"],
                 f["neto"],
@@ -124,7 +125,7 @@ def excel_documentos(db: Session, filtro: reports.Filtro, *, limite: int = 50_00
             ]
             for f in reports.por_tipo_documento(db, filtro)
         ],
-        {4: _FORMATO_MONEDA, 5: _FORMATO_MONEDA, 6: _FORMATO_MONEDA},
+        {5: _FORMATO_MONEDA, 6: _FORMATO_MONEDA, 7: _FORMATO_MONEDA},
     )
 
     _escribir_hoja(

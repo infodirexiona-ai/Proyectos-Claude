@@ -1,7 +1,7 @@
-# Facturas SII
+# EaSII
 
-Aplicación web para descargar el **Registro de Compras y Ventas (RCV)** del SII de Chile,
-guardarlo en una base de datos local y generar reportes exportables a Excel y CSV.
+Asistente de trámites del SII de Chile. Descarga el **Registro de Compras y Ventas (RCV)**,
+lo guarda en una base de datos local y genera reportes exportables a Excel y CSV.
 
 Autenticación con **RUT + clave tributaria**. Backend en FastAPI, almacenamiento en SQLite.
 

@@ -13,8 +13,8 @@ if not exist ".venv\Scripts\uvicorn.exe" (
 )
 
 REM El servidor corre en su propia ventana (identificala por el titulo
-REM "Facturas SII"): para apagarlo, cierra esa ventana o dale Ctrl+C ahi.
-start "Facturas SII" .venv\Scripts\uvicorn.exe app.web.main:app --port 8000
+REM "EaSII"): para apagarlo, cierra esa ventana o dale Ctrl+C ahi.
+start "EaSII" .venv\Scripts\uvicorn.exe app.web.main:app --port 8000
 
 REM Le da un momento al servidor para levantar antes de abrir el navegador.
 timeout /t 3 /nobreak >nul

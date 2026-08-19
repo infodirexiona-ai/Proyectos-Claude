@@ -84,6 +84,13 @@ def test_exportar_excel(cliente_con_datos):
     assert hoja.max_row > 1
     assert hoja["A1"].value == "Periodo"
 
+    hoja_tipos = libro["Por tipo de documento"]
+    cabeceras = [c.value for c in hoja_tipos[1]]
+    assert "Descripción" in cabeceras
+    columna_descripcion = cabeceras.index("Descripción") + 1
+    descripciones = [fila[columna_descripcion - 1].value for fila in hoja_tipos.iter_rows(min_row=2)]
+    assert any(descripciones)  # al menos un tipo de documento trae su descripción
+
 
 def test_exportar_csv(cliente_con_datos):
     respuesta = cliente_con_datos.get("/exportar.csv", params={"titular": RUT, "operacion": "COMPRA"})

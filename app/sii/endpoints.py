@@ -119,6 +119,38 @@ def nombre_tipo_dte(codigo: int | str | None) -> str:
         return "Desconocido"
 
 
+# Descripción breve de para qué sirve cada documento — pensada para alguien
+# sin formación contable, para exportarla junto al reporte "Por tipo de
+# documento" y no tener que adivinar qué es cada código.
+DESCRIPCIONES_DTE = {
+    30: "Factura en papel a otra empresa (en desuso, reemplazada por la 33 electrónica).",
+    32: "Venta de bienes o servicios exentos de IVA, en papel.",
+    33: "Respalda la venta de bienes y servicios afectos a IVA entre empresas.",
+    34: "Se usa para ventas o servicios que no llevan IVA.",
+    35: "Boleta en papel a consumidor final (en desuso, reemplazada por la 39 electrónica).",
+    38: "Boleta en papel a consumidor final, sin IVA (en desuso, reemplazada por la 41 electrónica).",
+    39: "Se emite a consumidores finales por operaciones afectas a IVA.",
+    41: "Comprobante para consumidores finales en ventas o servicios no afectos a IVA.",
+    43: "Rendición de cuentas de quien vende por cuenta de otro (ej. un corredor) hacia el mandante.",
+    45: "Factura de compra en papel, emitida por el comprador (en desuso, reemplazada por la 46).",
+    46: "Emitida por el comprador cuando le compra a un vendedor que no tiene obligación de emitir facturas.",
+    52: "Documento obligatorio que respalda el traslado físico de mercaderías.",
+    56: "Se usa para recuperar gastos, cobrar intereses o corregir cobros de más en una factura.",
+    60: "Nota de crédito en papel (en desuso, reemplazada por la 61 electrónica).",
+    61: "Sirve para anular facturas, otorgar descuentos o devolver montos.",
+    110: "Respalda la venta de bienes o servicios a clientes en el extranjero.",
+    111: "Corrige al alza una factura de exportación ya emitida.",
+    112: "Anula o corrige a la baja una factura de exportación ya emitida.",
+}
+
+
+def descripcion_tipo_dte(codigo: int | str | None) -> str:
+    try:
+        return DESCRIPCIONES_DTE.get(int(codigo), "")  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return ""
+
+
 # --- Sistema de Facturación Gratuita del SII (MIPYME) -----------------------
 #
 # Portal distinto al RCV: no es una SPA Angular sino páginas CGI clásicas

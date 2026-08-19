@@ -44,8 +44,8 @@ async def ciclo_de_vida(_app: FastAPI):
 
 
 app = FastAPI(
-    title="Descarga de facturas SII",
-    description="Descarga el Registro de Compras y Ventas del SII de Chile y genera reportes.",
+    title="EaSII",
+    description="Asistente de trámites del SII: descarga el Registro de Compras y Ventas y genera reportes.",
     version=__version__,
     lifespan=ciclo_de_vida,
 )

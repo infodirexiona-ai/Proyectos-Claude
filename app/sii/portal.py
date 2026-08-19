@@ -15,9 +15,12 @@ from dataclasses import dataclass, field
 
 import httpx
 
+from ..config import RAIZ
 from ..rut import Rut, parse_rut
 from . import endpoints as ep
 from .errors import CredencialesInvalidas, SiiError
+
+RUTA_CAPTURA_LOGIN_FALLIDO = RAIZ / "data" / "diagnostico" / "ultimo_login_fallido.png"
 
 log = logging.getLogger(__name__)
 
@@ -110,8 +113,14 @@ def _login_en_pagina(pagina, rut_obj: Rut, clave_tributaria: str, entorno: str, 
 
     url_final = pagina.url
     if "IngresoRutClave" in url_final or "CAutInicio" in url_final:
+        RUTA_CAPTURA_LOGIN_FALLIDO.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            pagina.screenshot(path=str(RUTA_CAPTURA_LOGIN_FALLIDO))
+        except Exception:  # noqa: BLE001 - la captura es un apoyo, no debe tapar el error real
+            log.warning("No se pudo guardar la captura de pantalla del login fallido.")
         raise CredencialesInvalidas(
-            "El SII rechazó el acceso: revisa el RUT y la clave tributaria (o el portal pidió un captcha)."
+            "El SII rechazó el acceso: revisa el RUT y la clave tributaria (o el portal pidió un captcha). "
+            f"Se guardó una captura de pantalla en {RUTA_CAPTURA_LOGIN_FALLIDO}."
         )
 
 

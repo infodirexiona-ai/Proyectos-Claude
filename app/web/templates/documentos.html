@@ -57,6 +57,24 @@
     </form>
   </details>
 
+  <details class="tarjeta-detalle-ventas">
+    <summary>Eliminar documentos de este RUT (irreversible)</summary>
+    <p class="nota">
+      Borra todos los documentos guardados de <strong>{{ titular }}</strong> — útil para limpiar
+      datos de prueba o de un RUT equivocado. No borra la credencial guardada ni el historial de
+      Descargas; eso se hace aparte, desde sus propias páginas.
+    </p>
+    <form
+      method="post"
+      action="/documentos/eliminar-todo"
+      class="formulario-linea"
+      onsubmit="return confirm('¿Eliminar TODOS los documentos de {{ titular }}? Esto no se puede deshacer.')"
+    >
+      <input type="hidden" name="titular" value="{{ titular }}">
+      <button type="submit" class="boton-peligro">Eliminar todos los documentos de {{ titular }}</button>
+    </form>
+  </details>
+
   <table class="tabla tabla-densa">
     <thead>
       <tr>

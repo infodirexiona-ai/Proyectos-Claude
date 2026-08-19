@@ -10,7 +10,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, Form, HTTPException, Quer
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from .. import __version__
@@ -18,7 +18,7 @@ from ..config import get_settings
 from ..crypto import ClaveCifradoAusente, cifrar, descifrar
 from ..db import crear_esquema, get_db
 from ..diagnostico import ejecutar_diagnostico
-from ..models import Credencial, Sincronizacion
+from ..models import Credencial, Documento, Sincronizacion
 from ..rut import RutInvalido, parse_rut
 from ..services import export, reports
 from ..services.periodos import PeriodoInvalido, normalizar_fecha, periodo_actual, rango_periodos
@@ -220,6 +220,22 @@ def vista_documentos(
         },
         periodos=reports.periodos_disponibles(db, activo),
     )
+
+
+@app.post("/documentos/eliminar-todo")
+def eliminar_documentos_titular(db: Session = Depends(get_db), titular: str = Form(...)):
+    """Borra todos los documentos guardados de un titular (no la credencial).
+
+    Pensado para limpiar datos de prueba o de un RUT equivocado. No toca el
+    historial de Descargas ni la credencial guardada — esos se borran aparte.
+    """
+    try:
+        rut_titular = str(parse_rut(titular))
+    except RutInvalido as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    db.execute(delete(Documento).where(Documento.rut_titular == rut_titular))
+    db.commit()
+    return RedirectResponse(url="/documentos", status_code=303)
 
 
 # --- Reportes ---------------------------------------------------------------

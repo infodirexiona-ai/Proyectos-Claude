@@ -338,3 +338,25 @@ def test_documentos_pagina_dos_es_navegable_por_numero(cliente_con_datos):
     respuesta = cliente_con_datos.get("/documentos", params={"titular": RUT})
     assert 'href="/documentos?' in respuesta.text
     assert "pagina=2" in respuesta.text
+
+
+def test_elimina_todos_los_documentos_de_un_titular(cliente_con_datos):
+    """Para limpiar datos de prueba o de un RUT equivocado, sin tocar la
+    credencial guardada ni el historial de Descargas."""
+    from sqlalchemy import select
+
+    from app.db import SessionLocal
+    from app.models import Documento, Sincronizacion
+
+    with SessionLocal() as db:
+        assert db.scalars(select(Documento).where(Documento.rut_titular == RUT)).first() is not None
+
+    respuesta = cliente_con_datos.post(
+        "/documentos/eliminar-todo", data={"titular": RUT}, follow_redirects=False
+    )
+    assert respuesta.status_code == 303
+
+    with SessionLocal() as db:
+        assert db.scalars(select(Documento).where(Documento.rut_titular == RUT)).all() == []
+        # No toca el historial de descargas ni (por extensión) la credencial.
+        assert db.scalars(select(Sincronizacion)).first() is not None

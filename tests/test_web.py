@@ -389,3 +389,26 @@ def test_eliminar_documentos_vuelve_a_reportes_si_se_pide(cliente_con_datos):
     )
     assert respuesta.status_code == 303
     assert respuesta.headers["location"].startswith("/reportes")
+
+
+def test_recuerda_el_titular_al_cambiar_de_pagina(cliente_con_datos):
+    """Sin RUT en la URL, cada página debería quedarse en la última empresa
+    consultada (cookie) en vez de volver siempre a la primera alfabética."""
+    OTRO_RUT = "76655600-0"
+    assert OTRO_RUT > RUT  # RUT sería el "primero" alfabético por defecto
+
+    cliente_con_datos.post(
+        "/sincronizar",
+        data={"rut": OTRO_RUT, "desde": "202403", "hasta": "202404", "compras": "on", "ventas": "on"},
+    )
+
+    respuesta = cliente_con_datos.get("/documentos", params={"titular": OTRO_RUT})
+    assert respuesta.status_code == 200
+    assert f"titular_activo={OTRO_RUT}" in respuesta.headers.get("set-cookie", "")
+
+    # Sin titular en la URL (como al hacer clic en el menú de navegación),
+    # debe quedarse en OTRO_RUT gracias a la cookie, no volver a RUT.
+    respuesta = cliente_con_datos.get("/reportes")
+    assert OTRO_RUT in respuesta.text
+    respuesta = cliente_con_datos.get("/")
+    assert OTRO_RUT in respuesta.text

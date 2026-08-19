@@ -72,18 +72,36 @@ def _contexto(request: Request, db: Session, **extra) -> dict:
     return contexto
 
 
+_COOKIE_TITULAR = "titular_activo"
+
+
 def _render(request: Request, db: Session, plantilla: str, **extra):
-    return plantillas.TemplateResponse(request, plantilla, _contexto(request, db, **extra))
+    respuesta = plantillas.TemplateResponse(request, plantilla, _contexto(request, db, **extra))
+    titular = extra.get("titular")
+    if titular:
+        # Recuerda la última empresa consultada para que no se pierda al
+        # cambiar de pestaña (Panel, Documentos, Reportes...), ya que el menú
+        # no manda el RUT en cada link.
+        respuesta.set_cookie(_COOKIE_TITULAR, titular, max_age=60 * 60 * 24 * 365, samesite="lax")
+    return respuesta
 
 
-def _titular_activo(db: Session, rut: str | None) -> str | None:
-    """RUT sobre el que se está trabajando: el pedido, o el primero disponible."""
+def _titular_activo(db: Session, rut: str | None, cookie: str | None = None) -> str | None:
+    """RUT sobre el que se está trabajando: el pedido, el de la última visita
+    (cookie), o el primero disponible."""
     if rut:
         try:
             return str(parse_rut(rut))
         except RutInvalido:
             return None
     candidatos = reports.titulares(db)
+    if cookie:
+        try:
+            candidato = str(parse_rut(cookie))
+        except RutInvalido:
+            candidato = None
+        if candidato and candidato in candidatos:
+            return candidato
     if candidatos:
         return candidatos[0]
     primera = db.scalars(select(Credencial).order_by(Credencial.id)).first()
@@ -146,7 +164,7 @@ def _filtro(
 # --- Panel ------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def panel(request: Request, db: Session = Depends(get_db), titular: str | None = Query(None)):
-    activo = _titular_activo(db, titular)
+    activo = _titular_activo(db, titular, request.cookies.get(_COOKIE_TITULAR))
     datos = {"totales_compra": None, "totales_venta": None, "por_periodo": [], "iva": []}
     if activo:
         filtro = reports.Filtro(rut_titular=activo)
@@ -173,7 +191,7 @@ def vista_documentos(
     orden: str = Query("fecha"),
     pagina: int = Query(1, ge=1),
 ):
-    activo = _titular_activo(db, titular)
+    activo = _titular_activo(db, titular, request.cookies.get(_COOKIE_TITULAR))
     if not activo:
         return _render(
             request,
@@ -258,7 +276,7 @@ def vista_reportes(
     hasta: str | None = Query(None),
     operacion: str | None = Query(None),
 ):
-    activo = _titular_activo(db, titular)
+    activo = _titular_activo(db, titular, request.cookies.get(_COOKIE_TITULAR))
     datos = {"por_periodo": [], "por_tipo": [], "por_contraparte": [], "iva": [], "totales": None}
     if activo:
         filtro = _filtro(activo, desde, hasta, operacion)

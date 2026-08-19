@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -108,6 +109,29 @@ def _titular_activo(db: Session, rut: str | None, cookie: str | None = None) -> 
     return primera.rut_titular if primera else None
 
 
+_COOKIE_FILTROS_DOCUMENTOS = "filtros_documentos"
+_CAMPOS_FILTRO_DOCUMENTOS = ("desde", "hasta", "operacion", "tipo_doc", "contraparte", "q", "orden")
+
+
+def _filtros_guardados(request: Request) -> dict[str, str]:
+    """Últimos filtros usados en Documentos, guardados en una cookie.
+
+    Sólo se aplican cuando se entra a la página sin ningún parámetro en la
+    URL (por ejemplo, al hacer clic en "Documentos" del menú) — así "Limpiar"
+    y los links con filtros propios (paginación, "ver contraparte X" desde
+    Reportes) siguen mandando exactamente lo que dicen, sin que la cookie se
+    entrometa.
+    """
+    crudo = request.cookies.get(_COOKIE_FILTROS_DOCUMENTOS)
+    if not crudo:
+        return {}
+    try:
+        datos = json.loads(crudo)
+    except ValueError:
+        return {}
+    return datos if isinstance(datos, dict) else {}
+
+
 def _entero_opcional(valor: str | None) -> int | None:
     """Convierte a int, tratando "" (lo que manda un <select> en "Todos") como ausente.
 
@@ -188,10 +212,27 @@ def vista_documentos(
     tipo_doc: str | None = Query(None),
     contraparte: str | None = Query(None),
     q: str | None = Query(None),
-    orden: str = Query("fecha"),
+    orden: str | None = Query(None),
     pagina: int = Query(1, ge=1),
 ):
     activo = _titular_activo(db, titular, request.cookies.get(_COOKIE_TITULAR))
+
+    if not request.url.query:
+        # Se entró sin ningún parámetro (p. ej. clic en "Documentos" del
+        # menú): restaura los últimos filtros usados en vez de mostrar
+        # siempre "Todos". Cualquier parámetro explícito (incluido
+        # "Limpiar", que sólo manda ?titular=) desactiva esto.
+        guardados = _filtros_guardados(request)
+        desde = guardados.get("desde") or None
+        hasta = guardados.get("hasta") or None
+        operacion = guardados.get("operacion") or None
+        tipo_doc = guardados.get("tipo_doc") or None
+        contraparte = guardados.get("contraparte") or None
+        q = guardados.get("q") or None
+        orden = guardados.get("orden") or None
+
+    orden = orden or "fecha"
+
     if not activo:
         return _render(
             request,
@@ -216,7 +257,16 @@ def vista_documentos(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     paginas = max(1, -(-total // por_pagina))
-    return _render(
+    filtros_efectivos = {
+        "desde": desde or "",
+        "hasta": hasta or "",
+        "operacion": operacion or "",
+        "tipo_doc": tipo_doc or "",
+        "contraparte": contraparte or "",
+        "q": q or "",
+        "orden": orden,
+    }
+    respuesta = _render(
         request,
         db,
         "documentos.html",
@@ -228,16 +278,16 @@ def vista_documentos(
         paginas=paginas,
         paginas_visibles=_paginas_visibles(pagina, paginas),
         orden=orden,
-        filtros={
-            "desde": desde or "",
-            "hasta": hasta or "",
-            "operacion": operacion or "",
-            "tipo_doc": tipo_doc or "",
-            "contraparte": contraparte or "",
-            "q": q or "",
-        },
+        filtros=filtros_efectivos,
         periodos=reports.periodos_disponibles(db, activo),
     )
+    respuesta.set_cookie(
+        _COOKIE_FILTROS_DOCUMENTOS,
+        json.dumps(filtros_efectivos),
+        max_age=60 * 60 * 24 * 365,
+        samesite="lax",
+    )
+    return respuesta
 
 
 @app.post("/documentos/eliminar-todo")

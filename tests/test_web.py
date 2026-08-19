@@ -412,3 +412,29 @@ def test_recuerda_el_titular_al_cambiar_de_pagina(cliente_con_datos):
     assert OTRO_RUT in respuesta.text
     respuesta = cliente_con_datos.get("/")
     assert OTRO_RUT in respuesta.text
+
+
+def test_recuerda_el_filtro_de_operacion_al_volver_sin_parametros(cliente_con_datos):
+    """Filtrar por Ventas y luego entrar a /documentos sin parámetros (como
+    al hacer clic en el menú) debería seguir mostrando sólo Ventas."""
+    respuesta = cliente_con_datos.get("/documentos", params={"titular": RUT, "operacion": "VENTA"})
+    assert respuesta.status_code == 200
+    assert "filtros_documentos=" in respuesta.headers.get("set-cookie", "")
+
+    respuesta = cliente_con_datos.get("/documentos")
+    assert 'value="VENTA" selected' in respuesta.text
+    assert "etiqueta-compra" not in respuesta.text.split("<tbody>")[1]
+
+
+def test_limpiar_filtros_borra_lo_guardado(cliente_con_datos):
+    """ "Limpiar" (?titular=X sin más parámetros) debe ganarle a lo guardado,
+    y ese "sin filtro" debe quedar como lo nuevo por defecto."""
+    cliente_con_datos.get("/documentos", params={"titular": RUT, "operacion": "VENTA"})
+
+    respuesta = cliente_con_datos.get("/documentos", params={"titular": RUT})
+    assert respuesta.status_code == 200
+
+    respuesta = cliente_con_datos.get("/documentos")
+    cuerpo = respuesta.text.split("<tbody>")[1]
+    assert "etiqueta-compra" in cuerpo
+    assert "etiqueta-venta" in cuerpo

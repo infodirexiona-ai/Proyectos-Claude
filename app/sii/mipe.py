@@ -86,9 +86,7 @@ def _intentar_descarga(pagina, fecha_desde: date, fecha_hasta: date, timeout_ms:
         except PlaywrightTimeout:
             if mensaje_dialogo["texto"]:
                 return None, mensaje_dialogo["texto"]
-            raise SiiError(
-                f"La descarga del detalle de ventas ({fecha_desde} a {fecha_hasta}) no respondió a tiempo."
-            ) from None
+            return None, "no respondió a tiempo"
 
         descarga = descarga_info.value
         ruta_temporal = descarga.path()
